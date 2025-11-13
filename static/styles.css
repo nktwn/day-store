@@ -353,3 +353,17 @@ small{font-size:.875rem;color:var(--muted)}
 /* Table variants */
 .table.striped tbody tr:nth-child(odd){background:#ffffff}
 .table.compact td{padding:8px}
+
+/* Inline badge for tables (История действий) */
+.badge-inline{
+  display:inline-flex;
+  align-items:center;
+  padding:2px 8px;
+  border-radius:999px;
+  font-size:12px;
+  background:#eef4ff;
+  border:1px solid var(--border-2);
+  color:#334155;
+  white-space:nowrap;
+}
+

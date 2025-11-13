@@ -15,7 +15,9 @@ from app.models import (
     ActionEnum,
     ProductOut,
     Category,
+    PurchaseOut,  # <-- добавили
 )
+
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -217,3 +219,52 @@ async def me_recommendation(
             )
         )
     return res
+
+@router.get("/me/purchases", response_model=List[PurchaseOut])
+async def me_purchases(
+        limit: Optional[int] = Query(100, ge=1, le=500),
+        user: UserInDB = Depends(get_current_user),
+):
+    """
+    История покупок пользователя (список товаров с датой покупки)
+    """
+    q: Dict = {
+        "userId": user.id,
+        "action": ActionEnum.PURCHASE.value,
+    }
+
+    cursor = actions_coll.find(q).sort("timestamp", -1)
+    if limit:
+        cursor = cursor.limit(limit)
+
+    acts = await cursor.to_list(length=limit or 500)
+    result: List[PurchaseOut] = []
+
+    for a in acts:
+        pid = a.get("productId")
+        if not pid:
+            continue
+
+        # Пробуем как ObjectId, если не валиден — как строковый id
+        doc = await products_coll.find_one({"_id": ObjectId(pid)}) if ObjectId.is_valid(pid) \
+            else await products_coll.find_one({"_id": pid})
+
+        if not doc:
+            continue
+
+        product = ProductOut(
+            id=str(doc["_id"]),
+            brand=doc.get("brand"),
+            model=doc.get("model"),
+            price=doc.get("price"),
+            category=doc.get("category"),
+        )
+
+        result.append(
+            PurchaseOut(
+                timestamp=a.get("timestamp", datetime.utcnow()),
+                product=product,
+            )
+        )
+
+    return result

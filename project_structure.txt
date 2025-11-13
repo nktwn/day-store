@@ -36,10 +36,17 @@ day-store
 │   ├── objects
 │   │   ├── 05
 │   │   │   └── 0fa14de7ba49b116f153a85b4f5ae67c984d10
+│   │   ├── 09
+│   │   │   └── c73a6d789dec2648ca3ac7ea56ede345789cc3
 │   │   ├── 10
 │   │   │   └── de5acba7f6644cca674f8ada41ed12adbab720
+│   │   ├── 11
+│   │   │   └── 47d624c237ba1cdfcb3f2d4268251c9f8d90bf
 │   │   ├── 13
+│   │   │   ├── a9114a1ea2bc3272ad9cf01bdb46a60a875554
 │   │   │   └── af50f8601093a73ce50b1783c9d4b7a73f306f
+│   │   ├── 19
+│   │   │   └── 4402a05a8608e932239c964ca2a9f331cfdb66
 │   │   ├── 26
 │   │   │   └── e6b99187a01a47bffda31c2387779dee818d5c
 │   │   ├── 27
@@ -58,6 +65,8 @@ day-store
 │   │   │   └── 62aa2fb4f883d7b047942689da77cd43aa265f
 │   │   ├── 58
 │   │   │   └── 3c590cec0900265d8e14325b650d1f2f2cd43d
+│   │   ├── 5a
+│   │   │   └── 28a4138c7f98b1d1ededb67be1f34d2e6fd527
 │   │   ├── 5e
 │   │   │   └── 24dc2492fcf5bcd86bd12e0b547120c1f74117
 │   │   ├── 5f
@@ -75,14 +84,28 @@ day-store
 │   │   │   └── f852f122575fc3ac555cfa139947dfdf6ae052
 │   │   ├── 89
 │   │   │   └── b9f791fdd31cd867964b0da5896f95ae45640b
+│   │   ├── 8e
+│   │   │   └── 19852b667218675f9e314aabdf0ad88b548af8
+│   │   ├── 8f
+│   │   │   └── fbe8f4568f1b4214c0abf94f8fedc3586560c0
+│   │   ├── 90
+│   │   │   └── b9c0caf01bdf70768e618d2aa7633af60fdcfd
 │   │   ├── 93
 │   │   │   └── d1ac2f4df67db4f1445780a5d3cfdf7b3a0f2c
 │   │   ├── 97
 │   │   │   └── 112ca541ce7a3becf6c1ce692ed370f5990f25
+│   │   ├── 99
+│   │   │   └── 564bd04344c98410a80d1a3fc486db7deb0c7d
+│   │   ├── 9c
+│   │   │   └── e282e09244d734d913a2035e08b1bfeb76bc4f
 │   │   ├── a0
 │   │   │   └── 705f815b0a6f9dc85f2167e6cb45a02a79f811
 │   │   ├── a3
 │   │   │   └── 322fa4622ac4049661027641b1bd720bb07ee9
+│   │   ├── a7
+│   │   │   └── 5a7fcfa9484d1dc6ee74cd12b64fea5bd63fb0
+│   │   ├── ab
+│   │   │   └── 927e6c1a55ae96e11ddd41840cb3ce440db321
 │   │   ├── ad
 │   │   │   ├── 0e39f4863ed703b471dd8d5a30a0c149cc2d03
 │   │   │   └── 5da33e24a9f7b6e3b0746c6b351090c9fe33e1
@@ -91,34 +114,48 @@ day-store
 │   │   │   └── 8d6705dc67d6eafea7cc92a96f5810041e5feb
 │   │   ├── b5
 │   │   │   └── 70544247f588b3bdb71d526a1e5913eb397d27
+│   │   ├── bd
+│   │   │   └── c449598e498850cbf6c331c583621ec8cddb2e
+│   │   ├── bf
+│   │   │   └── 1042471cfb6002293c4e315aa58fa15402b9f4
 │   │   ├── c1
-│   │   │   └── 26b7749323a31561c3432a4071c2d1a01e7bee
+│   │   │   ├── 26b7749323a31561c3432a4071c2d1a01e7bee
+│   │   │   └── 453bb2aee2e934fdc762375a691a3301ecada4
 │   │   ├── c9
 │   │   │   └── e01c0cfe66d8223ead7b9eabe26a16339de104
 │   │   ├── cc
 │   │   │   └── fa263ef6a3395d15be26d4ba00879cf3b3995c
 │   │   ├── d1
 │   │   │   └── 7d24485f34c0c8b1030fc290775f7784d143a0
+│   │   ├── d3
+│   │   │   └── e7bd56f21562ff28c5c6016199ed19722671b3
 │   │   ├── dc
 │   │   │   ├── 42c988285eb0a0fa4dcfdaa2c992e1da99b128
 │   │   │   └── 890fae206d11bf1838636210561632802f0a1b
 │   │   ├── e2
 │   │   │   └── 8cee19bacd8ad496f0ca3fb7a3f691509759a2
+│   │   ├── e6
+│   │   │   └── 1df7dfa0b2bb324c226ba3c095e3b07f267f61
 │   │   ├── e7
 │   │   │   └── 17f7075ee6cf23edbb60b3c0af2dfdb0cccec7
 │   │   ├── e8
 │   │   │   └── 8e0fd6ec2988c953d92ce0363756bb754f1fc0
 │   │   ├── ea
 │   │   │   └── e488d42a6545e3c34a2b5085b64af051c83e46
+│   │   ├── ed
+│   │   │   └── 6e72a43b7f5b1947276d3d3c4c3d9af3245cc9
 │   │   ├── ee
 │   │   │   └── 49170bd2010a25619a356026895ab51cf3dd26
 │   │   ├── ef
 │   │   │   └── f5e907a9a82dae8f6721c94a2306198b386aae
 │   │   ├── f2
-│   │   │   └── a34826489ff10310fb86aef4073a16e2d66f44
+│   │   │   ├── a34826489ff10310fb86aef4073a16e2d66f44
+│   │   │   └── f1b8c69f6a33f441bbcb193c84619a18e69b33
 │   │   ├── f3
 │   │   │   ├── 5cc2eb59062864d7594fa3a838f89914ba9394
 │   │   │   └── c22673b1af3e7dddf4c707718ae0870438e4ee
+│   │   ├── fc
+│   │   │   └── 18953bc977b96fb4a80b069356c227ff0b6758
 │   │   ├── fd
 │   │   │   └── f326638eba373f0b483a502ca1f73e3994a6ad
 │   │   ├── info
@@ -254,6 +291,10 @@ class UserActionOut(BaseModel):
     category: Optional[Category] = None
     timestamp: datetime = Field(..., alias="timestamp")
 
+class PurchaseOut(BaseModel):
+    timestamp: datetime
+    product: ProductOut
+
 --- app/main.py ---
 from fastapi import FastAPI
 import uvicorn
@@ -313,7 +354,9 @@ from app.models import (
     ActionEnum,
     ProductOut,
     Category,
+    PurchaseOut,  # <-- добавили
 )
+
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -515,6 +558,56 @@ async def me_recommendation(
             )
         )
     return res
+
+@router.get("/me/purchases", response_model=List[PurchaseOut])
+async def me_purchases(
+        limit: Optional[int] = Query(100, ge=1, le=500),
+        user: UserInDB = Depends(get_current_user),
+):
+    """
+    История покупок пользователя (список товаров с датой покупки)
+    """
+    q: Dict = {
+        "userId": user.id,
+        "action": ActionEnum.PURCHASE.value,
+    }
+
+    cursor = actions_coll.find(q).sort("timestamp", -1)
+    if limit:
+        cursor = cursor.limit(limit)
+
+    acts = await cursor.to_list(length=limit or 500)
+    result: List[PurchaseOut] = []
+
+    for a in acts:
+        pid = a.get("productId")
+        if not pid:
+            continue
+
+        # Пробуем как ObjectId, если не валиден — как строковый id
+        doc = await products_coll.find_one({"_id": ObjectId(pid)}) if ObjectId.is_valid(pid) \
+            else await products_coll.find_one({"_id": pid})
+
+        if not doc:
+            continue
+
+        product = ProductOut(
+            id=str(doc["_id"]),
+            brand=doc.get("brand"),
+            model=doc.get("model"),
+            price=doc.get("price"),
+            category=doc.get("category"),
+        )
+
+        result.append(
+            PurchaseOut(
+                timestamp=a.get("timestamp", datetime.utcnow()),
+                product=product,
+            )
+        )
+
+    return result
+
 --- app/routers/health.py ---
 from fastapi import APIRouter
 
@@ -1009,6 +1102,20 @@ function showHTML(html) {
   if (box) box.innerHTML = html;
 }
 
+function formatAction(action) {
+  switch (action) {
+    case "VIEW":
+      return "Просмотр";
+    case "LIKE":
+      return "Лайк";
+    case "PURCHASE":
+      return "Покупка";
+    default:
+      return action || "-";
+  }
+}
+
+
 async function onRegister() {
   const username = document.getElementById("regUser").value.trim();
   const password = document.getElementById("regPass").value;
@@ -1134,6 +1241,7 @@ async function onLogin() {
     // Загружаем информацию о пользователе и историю после входа
     await onWhoAmI();
     await onHistory();
+    await onPurchases();
 
   } catch (err) {
     setAuthToken("");
@@ -1154,14 +1262,15 @@ function onLogout() {
   document.getElementById("loginUser").value = "";
   document.getElementById("loginPass").value = "";
 
-  // Очищаем блоки информации
   document.getElementById("userInfo").innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
   document.getElementById("historyContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю</div>`;
+  document.getElementById("purchasesContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
 
   if (window.reflectAuthStatus) {
     window.reflectAuthStatus();
   }
 }
+
 
 async function onWhoAmI() {
   const userInfoDiv = document.getElementById("userInfo");
@@ -1184,9 +1293,9 @@ async function onWhoAmI() {
 
     const data = await response.json();
 
+    // БЕЗ ID, только username
     userInfoDiv.innerHTML = `
       <div class="kv">
-        <div><span>ID</span><b class="mono">${data.id}</b></div>
         <div><span>Username</span><b>${data.username}</b></div>
       </div>
     `;
@@ -1195,6 +1304,7 @@ async function onWhoAmI() {
     console.error("WhoAmI error:", e);
   }
 }
+
 
 async function onHistory() {
   const historyDiv = document.getElementById("historyContent");
@@ -1219,11 +1329,12 @@ async function onHistory() {
       return `
       <tr>
         <td>${formattedDate}</td>
-        <td><span class="badge">${a.action}</span></td>
+        <td><span class="badge">${formatAction(a.action)}</span></td>
         <td class="mono">${a.productId ? a.productId.substring(0, 8) + '...' : '-'}</td>
         <td>${a.category ?? "-"}</td>
       </tr>
-    `}).join("");
+    `;
+    }).join("");
 
     historyDiv.innerHTML = `
       <p class="muted" style="margin-bottom:12px;">Всего записей: ${data.length}</p>
@@ -1245,14 +1356,15 @@ async function onHistory() {
   }
 }
 
-// Инициализация обработчиков событий
+
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnRegister").addEventListener("click", onRegister);
   document.getElementById("btnLogin").addEventListener("click", onLogin);
   document.getElementById("btnLogout").addEventListener("click", onLogout);
   document.getElementById("btnHistory").addEventListener("click", onHistory);
+  document.getElementById("btnPurchases").addEventListener("click", onPurchases);
 
-  // Обработка Enter в полях ввода
+  // Enter
   document.getElementById("regPass2")?.addEventListener("keypress", (e) => {
     if (e.key === "Enter") onRegister();
   });
@@ -1261,12 +1373,69 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") onLogin();
   });
 
-  // Загружаем данные пользователя при загрузке страницы, если он авторизован
   if (getAuthToken()) {
     onWhoAmI();
     onHistory();
+    onPurchases();
   }
 });
+
+
+async function onPurchases() {
+  const box = document.getElementById("purchasesContent");
+
+  if (!getAuthToken()) {
+    box.innerHTML = `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
+    return;
+  }
+
+  try {
+    const data = await fetchJSON(`/api/v1/users/me/purchases`);
+
+    if (!Array.isArray(data) || !data.length) {
+      box.innerHTML = `<div class="muted">🛒 Пока нет покупок</div>`;
+      return;
+    }
+
+    const rows = data.map(p => {
+      const date = new Date(p.timestamp);
+      const formattedDate = date.toLocaleString('ru-RU');
+      const prod = p.product || {};
+
+      return `
+        <tr>
+          <td>${formattedDate}</td>
+          <td>${prod.brand || "?"}</td>
+          <td>${prod.model || "?"}</td>
+          <td>${prod.category ?? "-"}</td>
+          <td>${prod.price ?? "-"}</td>
+          <td class="mono">${prod.id ? prod.id.substring(0, 8) + "..." : "-"}</td>
+        </tr>
+      `;
+    }).join("");
+
+    box.innerHTML = `
+      <p class="muted" style="margin-bottom:12px;">Всего покупок: ${data.length}</p>
+      <table class="table compact">
+        <thead>
+          <tr>
+            <th>Время</th>
+            <th>Бренд</th>
+            <th>Модель</th>
+            <th>Категория</th>
+            <th>Цена</th>
+            <th>ID товара</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  } catch (e) {
+    box.innerHTML = `<div class="error">❌ Ошибка загрузки покупок: ${e.message}</div>`;
+    console.error("Purchases error:", e);
+  }
+}
+
 --- static/catalog.js ---
 import { fetchJSON, out, reflectAuthStatus, getAuthToken } from "./common.js";
 
@@ -1508,9 +1677,19 @@ loadProducts({ useCache: false }).catch(console.error);
             <div class="muted">Войдите, чтобы увидеть историю</div>
           </div>
         </div>
+
+        <!-- НОВАЯ КАРТОЧКА: История покупок -->
+        <div class="card big fade-in">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0">🛒 История покупок</h3>
+            <button id="btnPurchases" class="btn outline small">Обновить</button>
+          </div>
+          <div id="purchasesContent" style="max-height:400px;overflow-y:auto;">
+            <div class="muted">Войдите, чтобы увидеть историю покупок</div>
+          </div>
+        </div>
       </div>
-    </div>
-  </section>
+
 
   <!-- НИЖНЯЯ ЧАСТЬ: Вывод сообщений -->
   <section class="panel fade-in">

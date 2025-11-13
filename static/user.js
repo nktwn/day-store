@@ -5,6 +5,20 @@ function showHTML(html) {
   if (box) box.innerHTML = html;
 }
 
+function formatAction(action) {
+  switch (action) {
+    case "VIEW":
+      return "Просмотр";
+    case "LIKE":
+      return "Лайк";
+    case "PURCHASE":
+      return "Покупка";
+    default:
+      return action || "-";
+  }
+}
+
+
 async function onRegister() {
   const username = document.getElementById("regUser").value.trim();
   const password = document.getElementById("regPass").value;
@@ -130,6 +144,7 @@ async function onLogin() {
     // Загружаем информацию о пользователе и историю после входа
     await onWhoAmI();
     await onHistory();
+    await onPurchases();
 
   } catch (err) {
     setAuthToken("");
@@ -150,14 +165,15 @@ function onLogout() {
   document.getElementById("loginUser").value = "";
   document.getElementById("loginPass").value = "";
 
-  // Очищаем блоки информации
   document.getElementById("userInfo").innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
   document.getElementById("historyContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю</div>`;
+  document.getElementById("purchasesContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
 
   if (window.reflectAuthStatus) {
     window.reflectAuthStatus();
   }
 }
+
 
 async function onWhoAmI() {
   const userInfoDiv = document.getElementById("userInfo");
@@ -180,9 +196,9 @@ async function onWhoAmI() {
 
     const data = await response.json();
 
+    // БЕЗ ID, только username
     userInfoDiv.innerHTML = `
       <div class="kv">
-        <div><span>ID</span><b class="mono">${data.id}</b></div>
         <div><span>Username</span><b>${data.username}</b></div>
       </div>
     `;
@@ -191,6 +207,7 @@ async function onWhoAmI() {
     console.error("WhoAmI error:", e);
   }
 }
+
 
 async function onHistory() {
   const historyDiv = document.getElementById("historyContent");
@@ -213,13 +230,15 @@ async function onHistory() {
       const formattedDate = date.toLocaleString('ru-RU');
 
       return `
-      <tr>
-        <td>${formattedDate}</td>
-        <td><span class="badge">${a.action}</span></td>
-        <td class="mono">${a.productId ? a.productId.substring(0, 8) + '...' : '-'}</td>
-        <td>${a.category ?? "-"}</td>
-      </tr>
-    `}).join("");
+        <tr>
+          <td>${formattedDate}</td>
+          <td><span class="badge-inline">${formatAction(a.action)}</span></td>
+          <td class="mono">${a.productId ? a.productId.substring(0, 8) + '...' : '-'}</td>
+          <td>${a.category ?? "-"}</td>
+        </tr>
+      `;
+    }).join("");
+
 
     historyDiv.innerHTML = `
       <p class="muted" style="margin-bottom:12px;">Всего записей: ${data.length}</p>
@@ -241,14 +260,15 @@ async function onHistory() {
   }
 }
 
-// Инициализация обработчиков событий
+
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnRegister").addEventListener("click", onRegister);
   document.getElementById("btnLogin").addEventListener("click", onLogin);
   document.getElementById("btnLogout").addEventListener("click", onLogout);
   document.getElementById("btnHistory").addEventListener("click", onHistory);
+  document.getElementById("btnPurchases").addEventListener("click", onPurchases);
 
-  // Обработка Enter в полях ввода
+  // Enter
   document.getElementById("regPass2")?.addEventListener("keypress", (e) => {
     if (e.key === "Enter") onRegister();
   });
@@ -257,9 +277,66 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") onLogin();
   });
 
-  // Загружаем данные пользователя при загрузке страницы, если он авторизован
   if (getAuthToken()) {
     onWhoAmI();
     onHistory();
+    onPurchases();
   }
 });
+
+
+async function onPurchases() {
+  const box = document.getElementById("purchasesContent");
+
+  if (!getAuthToken()) {
+    box.innerHTML = `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
+    return;
+  }
+
+  try {
+    const data = await fetchJSON(`/api/v1/users/me/purchases`);
+
+    if (!Array.isArray(data) || !data.length) {
+      box.innerHTML = `<div class="muted">🛒 Пока нет покупок</div>`;
+      return;
+    }
+
+    const rows = data.map(p => {
+      const date = new Date(p.timestamp);
+      const formattedDate = date.toLocaleString('ru-RU');
+      const prod = p.product || {};
+
+      return `
+        <tr>
+          <td>${formattedDate}</td>
+          <td>${prod.brand || "?"}</td>
+          <td>${prod.model || "?"}</td>
+          <td>${prod.category ?? "-"}</td>
+          <td>${prod.price ?? "-"}</td>
+          <td class="mono">${prod.id ? prod.id.substring(0, 8) + "..." : "-"}</td>
+        </tr>
+      `;
+    }).join("");
+
+    box.innerHTML = `
+      <p class="muted" style="margin-bottom:12px;">Всего покупок: ${data.length}</p>
+      <table class="table compact">
+        <thead>
+          <tr>
+            <th>Время</th>
+            <th>Бренд</th>
+            <th>Модель</th>
+            <th>Категория</th>
+            <th>Цена</th>
+            <th>ID товара</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  } catch (e) {
+    box.innerHTML = `<div class="error">❌ Ошибка загрузки покупок: ${e.message}</div>`;
+    console.error("Purchases error:", e);
+  }
+}
+

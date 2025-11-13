@@ -54,3 +54,7 @@ class UserActionOut(BaseModel):
     productId: Optional[str] = None
     category: Optional[Category] = None
     timestamp: datetime = Field(..., alias="timestamp")
+
+class PurchaseOut(BaseModel):
+    timestamp: datetime
+    product: ProductOut
