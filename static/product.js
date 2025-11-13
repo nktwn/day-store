@@ -52,7 +52,7 @@ function notFound(){
 async function load(){
   const id = getId(); if(!id){ out("No product id specified"); return; }
   skeleton(id);
-  try{ const data = await fetchJSON(`/api/v1/java/products/${encodeURIComponent(id)}`); hydrate(data); }
+  try{ const data = await fetchJSON(`/api/v1/products/${encodeURIComponent(id)}`); hydrate(data); }
   catch(e){ notFound(); out(e.message); }
 }
 
@@ -61,20 +61,20 @@ document.addEventListener("click", async (e)=>{
   const act = btn.dataset.act; const id = getId();
   try{
     if(act==="view"){
-      const data = await fetchJSON(`/api/v1/java/products/${id}`); out(data);
+      const data = await fetchJSON(`/api/v1/products/${id}`); out(data);
     }else if(act==="like"){
       if(!isLoggedIn()) return out("Login required");
-      const data = await fetchJSON(`/api/v1/java/products/${id}/like`, {method:"POST"}); out(data);
+      const data = await fetchJSON(`/api/v1/products/${id}/like`, {method:"POST"}); out(data);
     }else if(act==="unlike"){
       if(!isLoggedIn()) return out("Login required");
-      const res = await fetchJSON(`/api/v1/java/products/${id}/like`, {method:"DELETE"});
+      const res = await fetchJSON(`/api/v1/products/${id}/like`, {method:"DELETE"});
       out(typeof res==="string"?res:"unliked (204)");
     }else if(act==="cart"){
       cartAdd({id, brand:btn.dataset.brand||"", model:btn.dataset.model||"", price: btn.dataset.price?Number(btn.dataset.price):null});
       out("Added to cart");
     }else if(act==="buy"){
       if(!isLoggedIn()) return out("Login required");
-      const data = await fetchJSON(`/api/v1/java/products/${id}/buy`, {method:"POST"}); out(data);
+      const data = await fetchJSON(`/api/v1/products/${id}/buy`, {method:"POST"}); out(data);
     }
   }catch(err){ out(err.message); }
 });

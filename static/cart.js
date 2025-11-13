@@ -26,7 +26,7 @@ async function checkout(){
   if(!getAuthToken()) return out("Login required (Account page)");
   let ok=0, fail=0;
   for(const it of items){
-    try{ await fetchJSON(`/api/v1/java/products/${it.id}/buy`, {method:"POST"}); ok++; }
+    try{ await fetchJSON(`/api/v1/products/${it.id}/buy`, {method:"POST"}); ok++; }
     catch(e){ fail++; out(`Error ${it.id}: ${e.message}`); }
   }
   out(`Purchased: ${ok}, errors: ${fail}`);

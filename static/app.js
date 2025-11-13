@@ -1,4 +1,3 @@
-
 (function () {
 
   const out = (msg) => {
@@ -61,7 +60,7 @@
   async function loadProducts() {
     try {
       const useCache = getAuthToken() ? "false" : "true";
-      const data = await fetchJSON(`/api/v1/java/products?use_cache=${useCache}`);
+      const data = await fetchJSON(`/api/v1/products?use_cache=${useCache}`);
       renderProducts(data.items || []);
       updateControlsState();
     } catch (e) {
@@ -105,16 +104,16 @@
 
     try {
       if (act === "view") {
-        const data = await fetchJSON(`/api/v1/java/products/${pid}`);
+        const data = await fetchJSON(`/api/v1/products/${pid}`);
         out(data);
       } else if (act === "like") {
-        const data = await fetchJSON(`/api/v1/java/products/${pid}/like`, { method: "POST" });
+        const data = await fetchJSON(`/api/v1/products/${pid}/like`, { method: "POST" });
         out(data);
       } else if (act === "unlike") {
-        const data = await fetchJSON(`/api/v1/java/products/${pid}/like`, { method: "DELETE" });
+        const data = await fetchJSON(`/api/v1/products/${pid}/like`, { method: "DELETE" });
         out(data);
       } else if (act === "buy") {
-        const data = await fetchJSON(`/api/v1/java/products/${pid}/buy`, { method: "POST" });
+        const data = await fetchJSON(`/api/v1/products/${pid}/buy`, { method: "POST" });
         out(data);
       }
     } catch (err) {
@@ -141,7 +140,7 @@
     const p = document.getElementById("authPass")?.value;
     if (!u || !p) return out("Введите username и password для регистрации");
     try {
-      const res = await fetchJSON(`/api/v1/java/users/registration`, {
+      const res = await fetchJSON(`/api/v1/users/registration`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: u, password: p, passwordConfirmation: p })
@@ -158,14 +157,14 @@
     if (!u || !p) return out("Введите username и password для логина");
     const token = makeBasic(u, p);
     try {
-      const r = await fetch(`/api/v1/java/me/username`, { headers: { "Authorization": token } });
+      const r = await fetch(`/api/v1/users/me/username`, { headers: { "Authorization": token } });
       if (!r.ok) {
         const txt = await r.text();
         throw new Error(`Login failed: HTTP ${r.status}: ${txt}`);
       }
+      const txt = await r.text();
       setAuthToken(token);
-      const data = await r.json().catch(async () => ({ java_username: await r.text() }));
-      out({ login: "ok", whoami: data });
+      out({ login: "ok", whoami: txt.trim() });
       await loadProducts();
     } catch (e) {
       setAuthToken("");
@@ -182,7 +181,7 @@
   async function whoAmI() {
     if (!getAuthToken()) { out("Unauthorized: войдите (Basic)"); return; }
     try {
-      const data = await fetchJSON(`/api/v1/java/me/username`);
+      const data = await fetchJSON(`/api/v1/users/me/username`);
       out(data);
     } catch (e) {
       out(e.message);
@@ -192,7 +191,7 @@
   async function myHistory() {
     if (!getAuthToken()) { out("Unauthorized: войдите (Basic)"); return; }
     try {
-      const data = await fetchJSON(`/api/v1/java/users/me/history?all=true`);
+      const data = await fetchJSON(`/api/v1/users/me/history?all=true`);
       out(data);
     } catch (e) {
       out(e.message);

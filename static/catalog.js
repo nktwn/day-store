@@ -1,4 +1,3 @@
-// catalog.js — DayAru Store Front
 import { fetchJSON, out, reflectAuthStatus, getAuthToken } from "./common.js";
 
 function escapeHtml(s) {
@@ -8,7 +7,6 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;");
 }
 
-// ===== PRODUCT CARD =====
 function cardHtml(p) {
   return `
     <div class="card hover-raise">
@@ -35,10 +33,9 @@ function renderProducts(items) {
   wrap.innerHTML = items.map(cardHtml).join("");
 }
 
-// ===== LOAD PRODUCTS =====
 async function loadProducts({ useCache = false } = {}) {
   try {
-    const data = await fetchJSON(`/api/v1/java/products?use_cache=${useCache ? "true" : "false"}`);
+    const data = await fetchJSON(`/api/v1/products?use_cache=${useCache ? "true" : "false"}`);
     renderProducts(data.items || []);
     await maybeLoadRecommendations();
   } catch (e) {
@@ -46,7 +43,6 @@ async function loadProducts({ useCache = false } = {}) {
   }
 }
 
-// ===== BUTTON ACTIONS =====
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest("button.action");
   if (!btn) return;
@@ -54,16 +50,16 @@ document.addEventListener("click", async (e) => {
   const pid = btn.dataset.id;
   try {
     if (act === "view") {
-      const data = await fetchJSON(`/api/v1/java/products/${pid}`);
+      const data = await fetchJSON(`/api/v1/products/${pid}`);
       out(data);
     } else if (act === "like") {
-      const data = await fetchJSON(`/api/v1/java/products/${pid}/like`, { method: "POST" });
+      const data = await fetchJSON(`/api/v1/products/${pid}/like`, { method: "POST" });
       out(data);
     } else if (act === "unlike") {
-      const data = await fetchJSON(`/api/v1/java/products/${pid}/like`, { method: "DELETE" });
+      const data = await fetchJSON(`/api/v1/products/${pid}/like`, { method: "DELETE" });
       out(data);
     } else if (act === "buy") {
-      const data = await fetchJSON(`/api/v1/java/products/${pid}/buy`, { method: "POST" });
+      const data = await fetchJSON(`/api/v1/products/${pid}/buy`, { method: "POST" });
       out(data);
     }
   } catch (err) {
@@ -71,7 +67,6 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-// ===== SEARCH =====
 async function onSearch() {
   const q = document.getElementById("searchInput")?.value.trim() || "";
   try {
@@ -83,14 +78,12 @@ async function onSearch() {
   }
 }
 
-// ===== RECOMMENDATIONS =====
 async function maybeLoadRecommendations() {
   const list = document.getElementById("recoList");
   const hint = document.getElementById("recoHint");
   const section = document.getElementById("recoSection");
   if (!list || !hint || !section) return;
 
-  // показать секцию сразу при старте
   section.style.display = "";
   hint.textContent = "🔄 Загружаем персональные рекомендации...";
   list.innerHTML = `<div class="muted mono">Loading...</div>`;
@@ -102,9 +95,8 @@ async function maybeLoadRecommendations() {
   }
 
   try {
-    const data = await fetchJSON(`/api/v1/java/users/me/recommendation`);
+    const data = await fetchJSON(`/api/v1/users/me/recommendation`);
 
-    // Универсальная логика: ищем массив в любых полях
     let items = [];
     if (Array.isArray(data)) items = data;
     else if (Array.isArray(data.items)) items = data.items;
@@ -118,7 +110,6 @@ async function maybeLoadRecommendations() {
       return;
     }
 
-    // Отрисовать рекомендации
     list.innerHTML = items
       .map(
         (p) => `
@@ -135,7 +126,7 @@ async function maybeLoadRecommendations() {
       .join("");
 
     hint.textContent = "🎯 Персональные рекомендации";
-    section.style.display = ""; // показать блок
+    section.style.display = "";
   } catch (e) {
     console.error("RECO ERROR:", e);
     hint.textContent = "⚠️ Ошибка загрузки рекомендаций";
@@ -144,7 +135,6 @@ async function maybeLoadRecommendations() {
   }
 }
 
-// ===== CATEGORY FILTERS =====
 function selectedCategories() {
   const w = document.getElementById("catFilters");
   if (!w) return [];
@@ -161,7 +151,7 @@ async function applyCategoryFilter() {
   }
   const csv = cats.join(",");
   try {
-    const data = await fetchJSON(`/api/v1/java/products/by-category?category=${encodeURIComponent(csv)}`);
+    const data = await fetchJSON(`/api/v1/products/by-category?category=${encodeURIComponent(csv)}`);
     renderProducts(data.items || []);
     out({ filter: cats, count: data.count });
   } catch (e) {
@@ -175,11 +165,10 @@ function resetCategoryFilter() {
   loadProducts({ useCache: false }).catch(console.error);
 }
 
-// ===== EVENT LISTENERS =====
 document.getElementById("btnSearch")?.addEventListener("click", onSearch);
 document.getElementById("btnApplyCats")?.addEventListener("click", applyCategoryFilter);
 document.getElementById("btnResetCats")?.addEventListener("click", resetCategoryFilter);
 
-// ===== INIT =====
 reflectAuthStatus();
 loadProducts({ useCache: false }).catch(console.error);
+

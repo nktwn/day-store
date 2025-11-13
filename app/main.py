@@ -1,42 +1,17 @@
-from __future__ import annotations
-
-import logging
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
-
 from fastapi import FastAPI
+import uvicorn
+
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 
-from app.core.http_client import java_client
-from app.routers import health, java_proxy
-from app.routers import search as search_router
+from app.core.config import settings
+from app.core.security import ensure_service_user
+from app.routers import health, users, products, categories, search
 
-logger = logging.getLogger("fastapi-reco")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s: %(message)s",
-)
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    try:
-        await java_client.ensure_service_user()
-    except Exception as e:
-        logger.warning("[startup] Registration attempt failed: %s", e)
-    logger.info("[startup] FastAPI is up; Java base: %s", java_client.base_url)
-
-    yield
-
-    try:
-        await java_client.aclose()
-    except Exception:
-        pass
 
 app = FastAPI(
-    title="FastAPI Reco Service",
-    version="0.2.0",
-    lifespan=lifespan,
+    title="DayStore Backend (FastAPI)",
+    version="1.0.0",
 )
 
 app.add_middleware(
@@ -46,12 +21,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+async def on_startup():
+    await ensure_service_user()
+
 app.include_router(health.router)
-app.include_router(java_proxy.router)
-app.include_router(search_router.router)
+app.include_router(users.router)
+app.include_router(products.router)
+app.include_router(categories.router)
+app.include_router(search.router)
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
+
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=9000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=settings.port, reload=True)

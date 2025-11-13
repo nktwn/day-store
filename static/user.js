@@ -5,7 +5,6 @@ function showHTML(html) {
   if (box) box.innerHTML = html;
 }
 
-/* ========== Регистрация (захардкожено) ========== */
 async function onRegister() {
   const username = document.getElementById("regUser").value.trim();
   const password = document.getElementById("regPass").value;
@@ -29,7 +28,6 @@ async function onRegister() {
   console.log(`✅ Mock registration → user: ${username}, password: ${password}`);
 }
 
-/* ========== Авторизация ========== */
 async function onLogin() {
   const username = document.getElementById("loginUser").value.trim();
   const password = document.getElementById("loginPass").value;
@@ -40,7 +38,7 @@ async function onLogin() {
 
   const token = makeBasic(username, password);
   try {
-    const res = await fetch(`/api/v1/java/me/username`, {
+    const res = await fetch(`/api/v1/users/me/username`, {
       headers: { "Authorization": token }
     });
     const text = await res.text();
@@ -48,7 +46,7 @@ async function onLogin() {
     if (!res.ok) throw new Error(text);
 
     setAuthToken(token);
-    const cleanName = text.replace(/java_/g, "").trim();
+    const cleanName = text.trim();
 
     showHTML(`
       <div class="card fade-in">
@@ -62,22 +60,20 @@ async function onLogin() {
   }
 }
 
-/* ========== Выход ========== */
 function onLogout() {
   setAuthToken("");
   showHTML(`<div class="info">🚪 Вы вышли из системы</div>`);
 }
 
-/* ========== Кто я ========== */
 async function onWhoAmI() {
   if (!getAuthToken()) {
     showHTML(`<div class="warn">❗ Войдите, чтобы узнать информацию о себе</div>`);
     return;
   }
   try {
-    const data = await fetchJSON(`/api/v1/java/me/username`);
+    const data = await fetchJSON(`/api/v1/users/me/username`);
     const clean = (typeof data === "string")
-      ? data.replace(/java_/g, "").trim()
+      ? data.trim()
       : (data.user || data.username || "Unknown");
 
     showHTML(`
@@ -91,14 +87,13 @@ async function onWhoAmI() {
   }
 }
 
-/* ========== История действий ========== */
 async function onHistory() {
   if (!getAuthToken()) {
     showHTML(`<div class="warn">❗ Войдите, чтобы просмотреть историю</div>`);
     return;
   }
   try {
-    const data = await fetchJSON(`/api/v1/java/users/me/history?all=true`);
+    const data = await fetchJSON(`/api/v1/users/me/history?all=true`);
 
     if (!Array.isArray(data) || !data.length) {
       showHTML(`<div class="muted">📭 История пуста</div>`);
@@ -128,7 +123,6 @@ async function onHistory() {
   }
 }
 
-/* ========== Инициализация ========== */
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnRegister").addEventListener("click", onRegister);
   document.getElementById("btnLogin").addEventListener("click", onLogin);
