@@ -17,20 +17,27 @@ function skeleton(id){
         <div><span>Status</span><b id="pStatus" class="muted">Waiting server…</b></div>
       </div>
       <div class="actions" style="margin-top:14px">
-        <button class="btn" data-act="view">View</button>
-        <button class="btn ${isLoggedIn()?"":"ghost"} need-auth" data-act="like">Like</button>
+        <!-- оставляем только Like / Unlike / Add to Cart -->
+        <button class="btn ${isLoggedIn() ? "" : "ghost"} need-auth" data-act="like">Like</button>
         <button class="btn ghost need-auth" data-act="unlike">Unlike</button>
-        <button class="btn outline" data-act="cart" data-brand="" data-model="" data-price="">Add to Cart</button>
-        <button class="btn success need-auth" data-act="buy">Buy</button>
+        <button class="btn outline need-auth" data-act="cart" data-brand="" data-model="" data-price="">
+          Add to Cart
+        </button>
       </div>
     </div>
   `;
   reflectAuth();
 }
+
 function reflectAuth(){
   document.querySelectorAll(".need-auth").forEach(b=>{
-    if(isLoggedIn()){ b.removeAttribute("disabled"); b.classList.remove("ghost"); }
-    else { b.setAttribute("disabled","disabled"); b.classList.add("ghost"); }
+    if(isLoggedIn()){
+      b.removeAttribute("disabled");
+      b.classList.remove("ghost");
+    } else {
+      b.setAttribute("disabled","disabled");
+      b.classList.add("ghost");
+    }
   });
 }
 
@@ -42,43 +49,66 @@ function hydrate(p){
     <div><span>Status</span><b class="muted">Ready</b></div>
   `;
   const btnCart = document.querySelector('button[data-act="cart"]');
-  if(btnCart){ btnCart.dataset.brand = p.brand||""; btnCart.dataset.model = p.model||""; btnCart.dataset.price = p.price ?? ""; }
+  if(btnCart){
+    btnCart.dataset.brand = p.brand||"";
+    btnCart.dataset.model = p.model||"";
+    btnCart.dataset.price = p.price ?? "";
+  }
 }
 function notFound(){
   document.getElementById("pTitle").textContent = "Product not found";
-  const s = document.getElementById("pStatus"); if(s) s.textContent="Check product id";
+  const s = document.getElementById("pStatus");
+  if(s) s.textContent="Check product id";
 }
 
 async function load(){
-  const id = getId(); if(!id){ out("No product id specified"); return; }
+  const id = getId();
+  if(!id){ out("No product id specified"); return; }
   skeleton(id);
-  try{ const data = await fetchJSON(`/api/v1/products/${encodeURIComponent(id)}`); hydrate(data); }
-  catch(e){ notFound(); out(e.message); }
+  try{
+    const data = await fetchJSON(`/api/v1/products/${encodeURIComponent(id)}`);
+    hydrate(data);
+  }
+  catch(e){
+    notFound();
+    out(e.message);
+  }
 }
 
 document.addEventListener("click", async (e)=>{
-  const btn = e.target.closest("button.btn"); if(!btn) return;
-  const act = btn.dataset.act; const id = getId();
+  const btn = e.target.closest("button.btn");
+  if(!btn) return;
+  const act = btn.dataset.act;
+  const id = getId();
+
   try{
-    if(act==="view"){
-      const data = await fetchJSON(`/api/v1/products/${id}`); out(data);
-    }else if(act==="like"){
+    if(act==="like"){
       if(!isLoggedIn()) return out("Login required");
-      const data = await fetchJSON(`/api/v1/products/${id}/like`, {method:"POST"}); out(data);
+      const data = await fetchJSON(`/api/v1/products/${id}/like`, {method:"POST"});
+      out(data);
     }else if(act==="unlike"){
       if(!isLoggedIn()) return out("Login required");
       const res = await fetchJSON(`/api/v1/products/${id}/like`, {method:"DELETE"});
-      out(typeof res==="string"?res:"unliked (204)");
+      out(typeof res==="string" ? res : "unliked (204)");
     }else if(act==="cart"){
-      cartAdd({id, brand:btn.dataset.brand||"", model:btn.dataset.model||"", price: btn.dataset.price?Number(btn.dataset.price):null});
-      out("Added to cart");
-    }else if(act==="buy"){
       if(!isLoggedIn()) return out("Login required");
-      const data = await fetchJSON(`/api/v1/products/${id}/buy`, {method:"POST"}); out(data);
+      cartAdd({
+        id,
+        brand: btn.dataset.brand || "",
+        model: btn.dataset.model || "",
+        price: btn.dataset.price ? Number(btn.dataset.price) : null
+      });
+      out("Added to cart");
     }
-  }catch(err){ out(err.message); }
+  }catch(err){
+    out(err.message);
+  }
 });
 
-window.addEventListener("storage", ev=>{ if(ev.key==="AUTH"){ reflectAuth(); } });
+window.addEventListener("storage", ev=>{
+  if(ev.key==="AUTH"){
+    reflectAuth();
+  }
+});
 
 document.addEventListener("DOMContentLoaded", load);

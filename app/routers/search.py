@@ -1,7 +1,5 @@
 from typing import Optional, List
-
 from fastapi import APIRouter, Query
-
 from app.core.db import products_coll
 
 router = APIRouter(prefix="/api/v1/search", tags=["search"])

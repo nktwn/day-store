@@ -1,4 +1,4 @@
-import { fetchJSON, out, reflectAuthStatus, getAuthToken } from "./common.js";
+import { fetchJSON, out, reflectAuthStatus, getAuthToken, cartAdd } from "./common.js";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -9,70 +9,103 @@ function escapeHtml(s) {
 
 function cardHtml(p) {
   return `
-    <div class="card hover-raise">
+    <div class="card hover-raise product-card" data-id="${p.id}">
       <div class="card-head">
-        <h3 style="margin:0;font-size:18px">${escapeHtml(p.brand || "?")} — ${escapeHtml(p.model || "?")}</h3>
-        <a class="btn ghost" href="/product.html?id=${encodeURIComponent(p.id)}">Open</a>
+        <h3 style="margin:0;font-size:18px">
+          ${escapeHtml(p.brand || "?")} — ${escapeHtml(p.model || "?")}
+        </h3>
       </div>
       <div class="mono">id: ${escapeHtml(p.id || "")}</div>
       <div>Category: <b>${escapeHtml(p.category || "-")}</b></div>
       <div>Price: <b class="price">${p.price ?? "-"}</b></div>
+
       <div class="actions">
-        <button class="btn outline action" data-act="view" data-id="${p.id}">View</button>
-        <button class="btn action" data-act="like" data-id="${p.id}">Like</button>
-        <button class="btn ghost action" data-act="unlike" data-id="${p.id}">Unlike</button>
-        <button class="btn success action" data-act="buy" data-id="${p.id}">Buy</button>
+        <button
+          class="btn ghost action"
+          data-act="like"
+          data-id="${p.id}"
+        >
+          Like
+        </button>
+
+        <button
+          class="btn outline action"
+          data-act="unlike"
+          data-id="${p.id}"
+        >
+          Unlike
+        </button>
+
+        <button
+          class="btn success action"
+          data-act="add"
+          data-id="${p.id}"
+          data-brand="${escapeHtml(p.brand || "")}"
+          data-model="${escapeHtml(p.model || "")}"
+          data-price="${p.price ?? ""}"
+        >
+          Add to Cart
+        </button>
       </div>
     </div>
   `;
 }
 
+
+
 function renderProducts(items) {
   const wrap = document.getElementById("products");
   if (!wrap) return;
+  if (!items.length) {
+    wrap.innerHTML = `<div class="muted">Каталог пуст по текущим фильтрам</div>`;
+    return;
+  }
   wrap.innerHTML = items.map(cardHtml).join("");
 }
 
-async function loadProducts({ useCache = false } = {}) {
-  try {
-    const data = await fetchJSON(`/api/v1/products?use_cache=${useCache ? "true" : "false"}`);
-    renderProducts(data.items || []);
-    await maybeLoadRecommendations();
-  } catch (e) {
-    out(e.message);
-  }
+function selectedCategories() {
+  const w = document.getElementById("catFilters");
+  if (!w) return [];
+  return [...w.querySelectorAll('input[type="checkbox"]')]
+    .filter((i) => i.checked)
+    .map((i) => i.value.trim().toUpperCase());
 }
 
-document.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button.action");
-  if (!btn) return;
-  const act = btn.dataset.act;
-  const pid = btn.dataset.id;
-  try {
-    if (act === "view") {
-      const data = await fetchJSON(`/api/v1/products/${pid}`);
-      out(data);
-    } else if (act === "like") {
-      const data = await fetchJSON(`/api/v1/products/${pid}/like`, { method: "POST" });
-      out(data);
-    } else if (act === "unlike") {
-      const data = await fetchJSON(`/api/v1/products/${pid}/like`, { method: "DELETE" });
-      out(data);
-    } else if (act === "buy") {
-      const data = await fetchJSON(`/api/v1/products/${pid}/buy`, { method: "POST" });
-      out(data);
-    }
-  } catch (err) {
-    out(err.message);
-  }
-});
 
-async function onSearch() {
+async function reloadWithFilters() {
   const q = document.getElementById("searchInput")?.value.trim() || "";
+  const cats = selectedCategories();
+
   try {
-    const data = await fetchJSON(`/api/v1/search?q=${encodeURIComponent(q)}`);
-    renderProducts(data.items || []);
-    out({ search: q, count: data.count });
+    let items = [];
+
+    if (!q && !cats.length) {
+      const data = await fetchJSON(`/api/v1/products`);
+      items = Array.isArray(data) ? data : (data.items || []);
+    }
+    else if (q && cats.length) {
+      const data = await fetchJSON(`/api/v1/search?q=${encodeURIComponent(q)}`);
+      const all = data.items || [];
+      const set = new Set(cats);
+      items = all.filter(p => {
+        const cat = (p.category || "").toString().toUpperCase();
+        return !cat || set.has(cat);
+      });
+    }
+    else if (q && !cats.length) {
+      const data = await fetchJSON(`/api/v1/search?q=${encodeURIComponent(q)}`);
+      items = data.items || [];
+    }
+    else if (!q && cats.length) {
+      const csv = cats.join(",");
+      const data = await fetchJSON(`/api/v1/products/by-category?category=${encodeURIComponent(csv)}`);
+      items = data.items || [];
+    }
+
+    renderProducts(items);
+    out({ search: q || null, categories: cats, count: items.length });
+
+    await maybeLoadRecommendations();
   } catch (e) {
     out(e.message);
   }
@@ -81,16 +114,14 @@ async function onSearch() {
 async function maybeLoadRecommendations() {
   const list = document.getElementById("recoList");
   const hint = document.getElementById("recoHint");
-  const section = document.getElementById("recoSection");
-  if (!list || !hint || !section) return;
+  if (!list || !hint) return;
 
-  section.style.display = "";
-  hint.textContent = "🔄 Загружаем персональные рекомендации...";
   list.innerHTML = `<div class="muted mono">Loading...</div>`;
+  hint.textContent = "Загружаем персональные рекомендации...";
 
   if (!getAuthToken()) {
-    hint.textContent = "🔒 Войдите, чтобы получить рекомендации";
-    list.innerHTML = `<div class="muted mono">Нет данных</div>`;
+    hint.textContent = "Войдите в аккаунт, чтобы увидеть персональные рекомендации";
+    list.innerHTML = `<div class="muted">🔒 Нет данных для рекомендаций</div>`;
     return;
   }
 
@@ -104,9 +135,8 @@ async function maybeLoadRecommendations() {
     else if (Array.isArray(data.recommendations)) items = data.recommendations;
 
     if (!items.length) {
-      list.innerHTML = `<div class="muted">Пока нет персональных рекомендаций</div>`;
-      hint.textContent = "Нет данных";
-      section.style.display = "";
+      hint.textContent = "Пока недостаточно действий для рекомендаций";
+      list.innerHTML = `<div class="muted">Просматривайте и лайкайте товары, чтобы получить рекомендации</div>`;
       return;
     }
 
@@ -115,60 +145,92 @@ async function maybeLoadRecommendations() {
         (p) => `
         <div class="card fade-in">
           <div class="card-head">
-            <h4 style="margin:0">${escapeHtml(p.brand || "?")} — ${escapeHtml(p.model || "?")}</h4>
-            <a class="btn ghost" href="/product.html?id=${encodeURIComponent(p.id)}">Open</a>
+            <div>
+              <h4 style="margin:0">${escapeHtml(p.brand || "?")} — ${escapeHtml(p.model || "?")}</h4>
+              <div class="mono" style="font-size:11px;margin-top:2px;">
+                id: ${escapeHtml(p.id || "").slice(0,8)}...
+              </div>
+            </div>
+            <a class="btn ghost" href="/product.html?id=${encodeURIComponent(p.id)}" style="padding:6px 10px;font-size:12px;">Open</a>
           </div>
-          <div class="mono">id: ${escapeHtml(p.id || "")}</div>
-          <div>Category: <b>${escapeHtml(p.category || "-")}</b></div>
-          <div>Price: <b>${p.price ?? "-"}</b></div>
+          <div class="muted" style="font-size:12px;margin-top:4px;">
+            Категория: <b>${escapeHtml(p.category || "-")}</b> · Цена: <b>${p.price ?? "-"}</b>
+          </div>
         </div>`
       )
       .join("");
 
-    hint.textContent = "🎯 Персональные рекомендации";
-    section.style.display = "";
+    hint.textContent = "Персональные рекомендации";
   } catch (e) {
     console.error("RECO ERROR:", e);
-    hint.textContent = "⚠️ Ошибка загрузки рекомендаций";
-    list.innerHTML = `<div class="muted">Не удалось загрузить</div>`;
-    section.style.display = "";
+    hint.textContent = "Ошибка загрузки рекомендаций";
+    list.innerHTML = `<div class="muted">Не удалось загрузить рекомендации</div>`;
   }
 }
 
-function selectedCategories() {
-  const w = document.getElementById("catFilters");
-  if (!w) return [];
-  return [...w.querySelectorAll('input[type="checkbox"]')]
-    .filter((i) => i.checked)
-    .map((i) => i.value.trim().toUpperCase());
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button.action");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const pid = btn.dataset.id;
+
+  try {
+    if (act === "like") {
+      const data = await fetchJSON(`/api/v1/products/${pid}/like`, { method: "POST" });
+      out(data);
+    } else if (act === "unlike") {
+      const data = await fetchJSON(`/api/v1/products/${pid}/like`, { method: "DELETE" });
+      out(typeof data === "string" ? data : "unliked (204)");
+    } else if (act === "add") {
+      const brand = btn.dataset.brand || "";
+      const model = btn.dataset.model || "";
+      const priceRaw = btn.dataset.price || "";
+      const price = priceRaw === "" ? null : Number(priceRaw);
+      cartAdd({ id: pid, brand, model, price });
+      out(`Added to cart: ${brand} — ${model}`);
+    }
+  } catch (err) {
+    out(err.message);
+  }
+});
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest("button.action")) return;
+
+  const card = e.target.closest(".product-card");
+  if (!card) return;
+
+  const pid = card.dataset.id;
+  if (!pid) return;
+
+  window.location.href = `/product.html?id=${encodeURIComponent(pid)}`;
+});
+
+
+async function onSearch() {
+  await reloadWithFilters();
 }
 
 async function applyCategoryFilter() {
-  const cats = selectedCategories();
-  if (!cats.length) {
-    await loadProducts({ useCache: false });
-    return;
-  }
-  const csv = cats.join(",");
-  try {
-    const data = await fetchJSON(`/api/v1/products/by-category?category=${encodeURIComponent(csv)}`);
-    renderProducts(data.items || []);
-    out({ filter: cats, count: data.count });
-  } catch (e) {
-    out(e.message);
-  }
+  await reloadWithFilters();
 }
 
-function resetCategoryFilter() {
+function resetAllFilters() {
+  const input = document.getElementById("searchInput");
+  if (input) input.value = "";
+
   const w = document.getElementById("catFilters");
   if (w) w.querySelectorAll('input[type="checkbox"]').forEach((i) => (i.checked = false));
-  loadProducts({ useCache: false }).catch(console.error);
+
+  reloadWithFilters().catch(console.error);
 }
+
 
 document.getElementById("btnSearch")?.addEventListener("click", onSearch);
 document.getElementById("btnApplyCats")?.addEventListener("click", applyCategoryFilter);
-document.getElementById("btnResetCats")?.addEventListener("click", resetCategoryFilter);
+document.getElementById("btnResetCats")?.addEventListener("click", resetAllFilters);
 
 reflectAuthStatus();
-loadProducts({ useCache: false }).catch(console.error);
 
+reloadWithFilters().catch(console.error);
+maybeLoadRecommendations().catch(console.error);

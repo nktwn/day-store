@@ -33,12 +33,11 @@ def _product_out(doc) -> ProductOut:
     )
 
 
-@router.get("/", response_model=List[ProductOut])
+@router.get("", response_model=ProductsResponse)  # <--- ВАЖНО: путь "" вместо "/"
 async def list_products():
     docs = await products_coll.find({}).to_list(length=1000)
-    if not docs:
-        raise HTTPException(status_code=404, detail="No products found")
-    return [_product_out(d) for d in docs]
+    items = [_product_out(d) for d in docs]
+    return ProductsResponse(count=len(items), items=items)
 
 
 @router.get("/by-category", response_model=ProductsResponse)

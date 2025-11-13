@@ -13,47 +13,74 @@
 
 <main class="container wide fade-in">
 
-  <section class="hero">
+<section class="hero hero-compact">
+  <div class="hero-main">
     <div>
-      <h1>Добро пожаловать в наш магазин</h1>
-      <p>Интеллектуальный магазин техники с персональными рекомендациями</p>
-      <div class="searchbar">
-        <input id="searchInput" type="text" placeholder="Введите бренд или модель…" />
-        <button id="btnSearch" class="btn">Поиск</button>
-      </div>
+      <h1>Добро пожаловать в DayStore</h1>
+      <p class="hero-subtitle">
+        Интеллектуальный магазин техники с персональными рекомендациями.
+        Войдите в аккаунт, чтобы получить больше точных советов по выбору.
+      </p>
+      <p class="muted-2" style="font-size:13px;margin-top:6px;">
+        Ниже мы покажем товары, которые могут вам подойти прямо сейчас.
+      </p>
     </div>
-    <img src="https://cdn.jsdelivr.net/gh/encharm/Font-Awesome-SVG-PNG/white/png/256/laptop.png" alt="banner" style="justify-self:end;max-width:260px;">
-  </section>
 
-  <div class="layout" style="margin-top:32px;">
-    <aside class="sidebar">
-      <div class="section-title"><h3>Категории</h3></div>
-      <div id="catFilters" class="chips">
-        <label class="chip"><input type="checkbox" value="LAPTOP"> LAPTOP</label>
-        <label class="chip"><input type="checkbox" value="PC"> PC</label>
-        <label class="chip"><input type="checkbox" value="HEADPHONE"> HEADPHONE</label>
-        <label class="chip"><input type="checkbox" value="SMART_WATCH"> SMART WATCH</label>
-        <label class="chip"><input type="checkbox" value="CAMERA"> CAMERA</label>
-        <label class="chip"><input type="checkbox" value="PHONE"> PHONE</label>
-      </div>
-      <div class="btn-row" style="margin-top:16px;">
-        <button id="btnApplyCats" class="btn block outline">Применить</button>
-        <button id="btnResetCats" class="btn block ghost">Сбросить</button>
-      </div>
-    </aside>
-
-    <section class="panel">
-      <div class="panel-title"><h2>Каталог</h2></div>
-      <div id="products" class="grid auto-fit"></div>
-    </section>
+    <img
+      src="https://cdn.jsdelivr.net/gh/encharm/Font-Awesome-SVG-PNG/white/png/256/laptop.png"
+      alt="banner"
+      class="hero-image"
+      style="justify-self:end;max-width:220px;opacity:.95;"
+    >
   </div>
 
-  <section id="recoSection" class="panel" style="margin-top:40px;display:none;">
-    <div class="panel-title">
-      <h2>Ваши рекомендации</h2>
-      <div id="recoHint" class="muted"></div>
+  <div class="hero-reco">
+    <div class="hero-reco-header">
+      <span class="muted">🎯 Рекомендации для вас</span>
+      <span id="recoHint" class="muted-2" style="font-size:13px;"></span>
     </div>
-    <div id="recoList" class="grid auto-fit"></div>
+    <div id="recoList" class="hero-reco-list">
+    </div>
+  </div>
+</section>
+
+
+  <section class="panel filters-panel" style="margin-top:20px;">
+    <div class="filters-row">
+      <div class="filters-search">
+        <label class="muted" for="searchInput" style="display:block;margin-bottom:6px;">Поиск по каталогу</label>
+        <div class="searchbar" style="margin-top:0;">
+          <input id="searchInput" type="text" placeholder="Введите бренд или модель…" />
+          <button id="btnSearch" class="btn">Поиск</button>
+        </div>
+      </div>
+
+      <div class="filters-cats">
+        <div class="row between wrap" style="margin-bottom:6px;">
+          <span class="muted">Категории</span>
+          <div class="btn-row" style="gap:8px;">
+            <button id="btnApplyCats" class="btn outline">Применить</button>
+            <button id="btnResetCats" class="btn ghost">Сбросить</button>
+          </div>
+        </div>
+        <div id="catFilters" class="chips">
+          <label class="chip"><input type="checkbox" value="LAPTOP"> LAPTOP</label>
+          <label class="chip"><input type="checkbox" value="PC"> PC</label>
+          <label class="chip"><input type="checkbox" value="HEADPHONE"> HEADPHONE</label>
+          <label class="chip"><input type="checkbox" value="SMART_WATCH"> SMART WATCH</label>
+          <label class="chip"><input type="checkbox" value="CAMERA"> CAMERA</label>
+          <label class="chip"><input type="checkbox" value="PHONE"> PHONE</label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-top:20px;">
+    <div class="panel-title">
+      <h2>Каталог</h2>
+      <span class="muted" style="font-size:14px;">Результаты с учётом поиска и выбранных категорий</span>
+    </div>
+    <div id="products" class="grid auto-fit"></div>
   </section>
 
 </main>

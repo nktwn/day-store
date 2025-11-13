@@ -24,7 +24,6 @@ async function onRegister() {
   const password = document.getElementById("regPass").value;
   const confirm = document.getElementById("regPass2")?.value ?? password;
 
-  // Валидация на клиенте
   if (!username || !password) {
     showHTML(`<div class="warn">⚠️ Заполните имя и пароль</div>`);
     return;
@@ -46,7 +45,6 @@ async function onRegister() {
   }
 
   try {
-    // Отправка запроса на регистрацию
     const response = await fetch(`/api/v1/users/registration`, {
       method: "POST",
       headers: {
@@ -66,7 +64,6 @@ async function onRegister() {
         const errorJson = JSON.parse(errorText);
         errorMsg = errorJson.detail || errorText;
       } catch (e) {
-        // Если не JSON, используем текст как есть
       }
       throw new Error(errorMsg);
     }
@@ -81,7 +78,6 @@ async function onRegister() {
       </div>
     `);
 
-    // Очистка полей
     document.getElementById("regUser").value = "";
     document.getElementById("regPass").value = "";
     document.getElementById("regPass2").value = "";
@@ -117,7 +113,6 @@ async function onLogin() {
         const errorJson = JSON.parse(errorText);
         errorMsg = errorJson.detail || errorMsg;
       } catch (e) {
-        // Используем стандартное сообщение
       }
       throw new Error(errorMsg);
     }
@@ -141,7 +136,6 @@ async function onLogin() {
       window.reflectAuthStatus();
     }
 
-    // Загружаем информацию о пользователе и историю после входа
     await onWhoAmI();
     await onHistory();
     await onPurchases();
@@ -196,7 +190,6 @@ async function onWhoAmI() {
 
     const data = await response.json();
 
-    // БЕЗ ID, только username
     userInfoDiv.innerHTML = `
       <div class="kv">
         <div><span>Username</span><b>${data.username}</b></div>
@@ -268,7 +261,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnHistory").addEventListener("click", onHistory);
   document.getElementById("btnPurchases").addEventListener("click", onPurchases);
 
-  // Enter
   document.getElementById("regPass2")?.addEventListener("keypress", (e) => {
     if (e.key === "Enter") onRegister();
   });

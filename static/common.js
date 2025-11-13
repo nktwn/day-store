@@ -59,7 +59,6 @@ export function out(msg, id="output"){
   el.textContent = (typeof msg==="string") ? msg : JSON.stringify(msg,null,2);
 }
 
-/* --- Cart --- */
 const LS_CART = "CART_V1";
 function readCart(){ try{ return JSON.parse(localStorage.getItem(LS_CART)||"[]"); }catch{return []} }
 function writeCart(items){ localStorage.setItem(LS_CART, JSON.stringify(items)); reflectAuthStatus(); }
