@@ -11,48 +11,64 @@
 <div id="site-header"></div>
 <script type="module" src="/header.js"></script>
 
-<main class="container narrow fade-in">
+<main class="container wide fade-in">
   <section class="panel" style="margin-top:30px;">
     <div class="panel-title">
-      <h2>Вход и регистрация</h2>
-      <div class="muted">Создайте аккаунт или войдите, чтобы получать персональные рекомендации</div>
+      <h2>Управление аккаунтом</h2>
+      <div class="muted">Войдите или создайте аккаунт для персональных рекомендаций</div>
     </div>
 
     <div class="grid cols-2" style="gap:24px;">
-      <div class="card big fade-in">
-        <h3 style="margin:0 0 12px">Регистрация</h3>
-        <div class="u-col">
-          <input id="regUser" class="input" placeholder="Имя пользователя" />
-          <input id="regPass" class="input" type="password" placeholder="Пароль" />
-          <input id="regPass2" class="input" type="password" placeholder="Подтвердите пароль" />
-          <button id="btnRegister" class="btn block">Создать аккаунт</button>
+      <!-- ЛЕВАЯ ЧАСТЬ: Вход и Регистрация -->
+      <div class="u-col" style="gap:24px;">
+        <div class="card big fade-in">
+          <h3 style="margin:0 0 12px">🔐 Вход</h3>
+          <div class="u-col">
+            <input id="loginUser" class="input" placeholder="Имя пользователя" />
+            <input id="loginPass" class="input" type="password" placeholder="Пароль" />
+          </div>
+          <div class="btn-row" style="margin-top:10px;">
+            <button id="btnLogin" class="btn">Войти</button>
+            <button id="btnLogout" class="btn ghost">Выйти</button>
+          </div>
+        </div>
+
+        <div class="card big fade-in">
+          <h3 style="margin:0 0 12px">✨ Регистрация</h3>
+          <div class="u-col">
+            <input id="regUser" class="input" placeholder="Имя пользователя" />
+            <input id="regPass" class="input" type="password" placeholder="Пароль" />
+            <input id="regPass2" class="input" type="password" placeholder="Подтвердите пароль" />
+            <button id="btnRegister" class="btn block">Создать аккаунт</button>
+          </div>
         </div>
       </div>
 
-      <div class="card big fade-in">
-        <h3 style="margin:0 0 12px">Авторизация</h3>
-        <div class="u-col">
-          <input id="loginUser" class="input" placeholder="Имя пользователя" />
-          <input id="loginPass" class="input" type="password" placeholder="Пароль" />
+      <!-- ПРАВАЯ ЧАСТЬ: Информация о пользователе + История -->
+      <div class="u-col" style="gap:24px;">
+        <div class="card big fade-in">
+          <h3 style="margin:0 0 12px">👤 Информация о пользователе</h3>
+          <div id="userInfo" class="u-col">
+            <div class="muted">Войдите, чтобы увидеть информацию</div>
+          </div>
         </div>
-        <div class="btn-row" style="margin-top:10px;">
-          <button id="btnLogin" class="btn">Войти</button>
-          <button id="btnLogout" class="btn ghost">Выйти</button>
+
+        <div class="card big fade-in">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0">📜 История действий</h3>
+            <button id="btnHistory" class="btn outline small">Обновить</button>
+          </div>
+          <div id="historyContent" style="max-height:400px;overflow-y:auto;">
+            <div class="muted">Войдите, чтобы увидеть историю</div>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
+  <!-- НИЖНЯЯ ЧАСТЬ: Вывод сообщений -->
   <section class="panel fade-in">
-    <div class="panel-title"><h3>Действия</h3></div>
-    <div class="btn-row">
-      <button id="btnWhoAmI" class="btn">Кто я</button>
-      <button id="btnHistory" class="btn outline">История</button>
-    </div>
-  </section>
-
-  <section class="panel fade-in">
-    <div class="panel-title"><h3>Результат</h3></div>
+    <div class="panel-title"><h3>💬 Сообщения</h3></div>
     <div id="pretty" class="pretty"></div>
   </section>
 </main>

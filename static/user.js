@@ -10,123 +10,256 @@ async function onRegister() {
   const password = document.getElementById("regPass").value;
   const confirm = document.getElementById("regPass2")?.value ?? password;
 
+  // Валидация на клиенте
   if (!username || !password) {
     showHTML(`<div class="warn">⚠️ Заполните имя и пароль</div>`);
     return;
   }
+
+  if (username.length < 3) {
+    showHTML(`<div class="warn">⚠️ Имя пользователя должно быть не менее 3 символов</div>`);
+    return;
+  }
+
+  if (password.length < 6) {
+    showHTML(`<div class="warn">⚠️ Пароль должен быть не менее 6 символов</div>`);
+    return;
+  }
+
   if (password !== confirm) {
     showHTML(`<div class="error">❌ Пароли не совпадают</div>`);
     return;
   }
 
-  showHTML(`
-    <div class="card success fade-in">
-      <h3>Регистрация прошла успешно</h3>
-      <p>User '<b>${username || "dayana"}</b>' successfully registered</p>
-    </div>
-  `);
-  console.log(`✅ Mock registration → user: ${username}, password: ${password}`);
+  try {
+    // Отправка запроса на регистрацию
+    const response = await fetch(`/api/v1/users/registration`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username: username,
+        password: password,
+        passwordConfirmation: confirm
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMsg = errorText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMsg = errorJson.detail || errorText;
+      } catch (e) {
+        // Если не JSON, используем текст как есть
+      }
+      throw new Error(errorMsg);
+    }
+
+    const data = await response.json();
+
+    showHTML(`
+      <div class="card success fade-in">
+        <h3>✅ Регистрация прошла успешно</h3>
+        <p>Пользователь '<b>${data.username}</b>' успешно зарегистрирован</p>
+        <p class="muted">Теперь вы можете войти в систему</p>
+      </div>
+    `);
+
+    // Очистка полей
+    document.getElementById("regUser").value = "";
+    document.getElementById("regPass").value = "";
+    document.getElementById("regPass2").value = "";
+
+  } catch (err) {
+    showHTML(`<div class="error">❌ Ошибка регистрации: ${err.message}</div>`);
+    console.error("Registration error:", err);
+  }
 }
 
 async function onLogin() {
   const username = document.getElementById("loginUser").value.trim();
   const password = document.getElementById("loginPass").value;
+
   if (!username || !password) {
     showHTML(`<div class="warn">⚠️ Введите имя пользователя и пароль</div>`);
     return;
   }
 
   const token = makeBasic(username, password);
-  try {
-    const res = await fetch(`/api/v1/users/me/username`, {
-      headers: { "Authorization": token }
-    });
-    const text = await res.text();
 
-    if (!res.ok) throw new Error(text);
+  try {
+    const response = await fetch(`/api/v1/users/me/username`, {
+      headers: {
+        "Authorization": token
+      }
+    });
+
+    if (!response.ok) {
+      let errorMsg = "Неверное имя пользователя или пароль";
+      try {
+        const errorText = await response.text();
+        const errorJson = JSON.parse(errorText);
+        errorMsg = errorJson.detail || errorMsg;
+      } catch (e) {
+        // Используем стандартное сообщение
+      }
+      throw new Error(errorMsg);
+    }
+
+    const usernameFromServer = await response.text();
+    const cleanName = usernameFromServer.trim();
 
     setAuthToken(token);
-    const cleanName = text.trim();
 
     showHTML(`
-      <div class="card fade-in">
-        <h3>Добро пожаловать!</h3>
+      <div class="card success fade-in">
+        <h3>🎉 Добро пожаловать!</h3>
         <p>✅ Вход выполнен как <b>${cleanName}</b></p>
+        <p class="muted">Теперь вам доступны персональные рекомендации</p>
       </div>
     `);
+
+    document.getElementById("loginPass").value = "";
+
+    if (window.reflectAuthStatus) {
+      window.reflectAuthStatus();
+    }
+
+    // Загружаем информацию о пользователе и историю после входа
+    await onWhoAmI();
+    await onHistory();
+
   } catch (err) {
     setAuthToken("");
     showHTML(`<div class="error">❌ Ошибка входа: ${err.message}</div>`);
+    console.error("Login error:", err);
   }
 }
 
 function onLogout() {
   setAuthToken("");
-  showHTML(`<div class="info">🚪 Вы вышли из системы</div>`);
+  showHTML(`
+    <div class="info fade-in">
+      <h3>👋 До свидания!</h3>
+      <p>🚪 Вы успешно вышли из системы</p>
+    </div>
+  `);
+
+  document.getElementById("loginUser").value = "";
+  document.getElementById("loginPass").value = "";
+
+  // Очищаем блоки информации
+  document.getElementById("userInfo").innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
+  document.getElementById("historyContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю</div>`;
+
+  if (window.reflectAuthStatus) {
+    window.reflectAuthStatus();
+  }
 }
 
 async function onWhoAmI() {
+  const userInfoDiv = document.getElementById("userInfo");
+
   if (!getAuthToken()) {
-    showHTML(`<div class="warn">❗ Войдите, чтобы узнать информацию о себе</div>`);
+    userInfoDiv.innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
     return;
   }
-  try {
-    const data = await fetchJSON(`/api/v1/users/me/username`);
-    const clean = (typeof data === "string")
-      ? data.trim()
-      : (data.user || data.username || "Unknown");
 
-    showHTML(`
-      <div class="card fade-in">
-        <h3>Информация о пользователе</h3>
-        <p>👤 <b>${clean}</b></p>
+  try {
+    const response = await fetch(`/api/v1/users/me`, {
+      headers: {
+        "Authorization": getAuthToken()
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    userInfoDiv.innerHTML = `
+      <div class="kv">
+        <div><span>ID</span><b class="mono">${data.id}</b></div>
+        <div><span>Username</span><b>${data.username}</b></div>
       </div>
-    `);
+    `;
   } catch (e) {
-    showHTML(`<div class="error">Ошибка: ${e.message}</div>`);
+    userInfoDiv.innerHTML = `<div class="error">❌ Ошибка: ${e.message}</div>`;
+    console.error("WhoAmI error:", e);
   }
 }
 
 async function onHistory() {
+  const historyDiv = document.getElementById("historyContent");
+
   if (!getAuthToken()) {
-    showHTML(`<div class="warn">❗ Войдите, чтобы просмотреть историю</div>`);
+    historyDiv.innerHTML = `<div class="muted">Войдите, чтобы увидеть историю</div>`;
     return;
   }
+
   try {
     const data = await fetchJSON(`/api/v1/users/me/history?all=true`);
 
     if (!Array.isArray(data) || !data.length) {
-      showHTML(`<div class="muted">📭 История пуста</div>`);
+      historyDiv.innerHTML = `<div class="muted">📭 История действий пуста</div>`;
       return;
     }
 
-    const rows = data.map(a => `
+    const rows = data.map(a => {
+      const date = new Date(a.timestamp);
+      const formattedDate = date.toLocaleString('ru-RU');
+
+      return `
       <tr>
-        <td>${a.timestamp ?? "-"}</td>
-        <td>${a.action ?? "-"}</td>
-        <td>${a.productId ?? "-"}</td>
+        <td>${formattedDate}</td>
+        <td><span class="badge">${a.action}</span></td>
+        <td class="mono">${a.productId ? a.productId.substring(0, 8) + '...' : '-'}</td>
         <td>${a.category ?? "-"}</td>
       </tr>
-    `).join("");
+    `}).join("");
 
-    showHTML(`
-      <div class="card fade-in">
-        <h3>История действий</h3>
-        <table class="table compact">
-          <thead><tr><th>Время</th><th>Действие</th><th>ID товара</th><th>Категория</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    `);
+    historyDiv.innerHTML = `
+      <p class="muted" style="margin-bottom:12px;">Всего записей: ${data.length}</p>
+      <table class="table compact">
+        <thead>
+          <tr>
+            <th>Время</th>
+            <th>Действие</th>
+            <th>ID товара</th>
+            <th>Категория</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
   } catch (e) {
-    showHTML(`<div class="error">Ошибка загрузки истории: ${e.message}</div>`);
+    historyDiv.innerHTML = `<div class="error">❌ Ошибка загрузки истории: ${e.message}</div>`;
+    console.error("History error:", e);
   }
 }
 
+// Инициализация обработчиков событий
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnRegister").addEventListener("click", onRegister);
   document.getElementById("btnLogin").addEventListener("click", onLogin);
   document.getElementById("btnLogout").addEventListener("click", onLogout);
-  document.getElementById("btnWhoAmI").addEventListener("click", onWhoAmI);
   document.getElementById("btnHistory").addEventListener("click", onHistory);
+
+  // Обработка Enter в полях ввода
+  document.getElementById("regPass2")?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") onRegister();
+  });
+
+  document.getElementById("loginPass")?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") onLogin();
+  });
+
+  // Загружаем данные пользователя при загрузке страницы, если он авторизован
+  if (getAuthToken()) {
+    onWhoAmI();
+    onHistory();
+  }
 });
