@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>DayAru — Cart</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="site-header"></div>
+<script type="module" src="/header.js"></script>
+
+<main class="container narrow">
+  <section class="panel">
+    <h2 style="margin:0 0 12px">Your Cart</h2>
+    <div id="cartList"></div>
+    <div class="actions" style="margin-top:12px">
+      <button id="btnCheckout" class="btn success">Checkout</button>
+      <button id="btnClear" class="btn ghost">Clear</button>
+    </div>
+  </section>
+  <section>
+    <h3>Console</h3>
+    <pre id="output" class="log"></pre>
+  </section>
+</main>
+
+<script type="module" src="/common.js"></script>
+<script type="module" src="/cart.js"></script>
+</body>
+</html>

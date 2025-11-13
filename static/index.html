@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>DayAru Store — Каталог</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="site-header"></div>
+<script type="module" src="/header.js"></script>
+
+<main class="container wide fade-in">
+
+  <section class="hero">
+    <div>
+      <h1>Добро пожаловать в наш магазин</h1>
+      <p>Интеллектуальный магазин техники с персональными рекомендациями</p>
+      <div class="searchbar">
+        <input id="searchInput" type="text" placeholder="Введите бренд или модель…" />
+        <button id="btnSearch" class="btn">Поиск</button>
+      </div>
+    </div>
+    <img src="https://cdn.jsdelivr.net/gh/encharm/Font-Awesome-SVG-PNG/white/png/256/laptop.png" alt="banner" style="justify-self:end;max-width:260px;">
+  </section>
+
+  <div class="layout" style="margin-top:32px;">
+    <aside class="sidebar">
+      <div class="section-title"><h3>Категории</h3></div>
+      <div id="catFilters" class="chips">
+        <label class="chip"><input type="checkbox" value="LAPTOP"> LAPTOP</label>
+        <label class="chip"><input type="checkbox" value="PC"> PC</label>
+        <label class="chip"><input type="checkbox" value="HEADPHONE"> HEADPHONE</label>
+        <label class="chip"><input type="checkbox" value="SMART_WATCH"> SMART WATCH</label>
+        <label class="chip"><input type="checkbox" value="CAMERA"> CAMERA</label>
+        <label class="chip"><input type="checkbox" value="PHONE"> PHONE</label>
+      </div>
+      <div class="btn-row" style="margin-top:16px;">
+        <button id="btnApplyCats" class="btn block outline">Применить</button>
+        <button id="btnResetCats" class="btn block ghost">Сбросить</button>
+      </div>
+    </aside>
+
+    <section class="panel">
+      <div class="panel-title"><h2>Каталог</h2></div>
+      <div id="products" class="grid auto-fit"></div>
+    </section>
+  </div>
+
+  <section id="recoSection" class="panel" style="margin-top:40px;display:none;">
+    <div class="panel-title">
+      <h2>Ваши рекомендации</h2>
+      <div id="recoHint" class="muted"></div>
+    </div>
+    <div id="recoList" class="grid auto-fit"></div>
+  </section>
+
+</main>
+
+<script type="module" src="/common.js"></script>
+<script type="module" src="/catalog.js"></script>
+</body>
+</html>

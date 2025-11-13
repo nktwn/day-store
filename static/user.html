@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>DayAru Store — Аккаунт</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="site-header"></div>
+<script type="module" src="/header.js"></script>
+
+<main class="container narrow fade-in">
+  <section class="panel" style="margin-top:30px;">
+    <div class="panel-title">
+      <h2>Вход и регистрация</h2>
+      <div class="muted">Создайте аккаунт или войдите, чтобы получать персональные рекомендации</div>
+    </div>
+
+    <div class="grid cols-2" style="gap:24px;">
+      <!-- Регистрация -->
+      <div class="card big fade-in">
+        <h3 style="margin:0 0 12px">Регистрация</h3>
+        <div class="u-col">
+          <input id="regUser" class="input" placeholder="Имя пользователя" />
+          <input id="regPass" class="input" type="password" placeholder="Пароль" />
+          <input id="regPass2" class="input" type="password" placeholder="Подтвердите пароль" />
+          <button id="btnRegister" class="btn block">Создать аккаунт</button>
+        </div>
+      </div>
+
+      <!-- Авторизация -->
+      <div class="card big fade-in">
+        <h3 style="margin:0 0 12px">Авторизация</h3>
+        <div class="u-col">
+          <input id="loginUser" class="input" placeholder="Имя пользователя" />
+          <input id="loginPass" class="input" type="password" placeholder="Пароль" />
+        </div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button id="btnLogin" class="btn">Войти</button>
+          <button id="btnLogout" class="btn ghost">Выйти</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel fade-in">
+    <div class="panel-title"><h3>Действия</h3></div>
+    <div class="btn-row">
+      <button id="btnWhoAmI" class="btn">Кто я</button>
+      <button id="btnHistory" class="btn outline">История</button>
+    </div>
+  </section>
+
+  <section class="panel fade-in">
+    <div class="panel-title"><h3>Результат</h3></div>
+    <div id="pretty" class="pretty"></div>
+  </section>
+</main>
+
+<script type="module" src="/common.js"></script>
+<script type="module" src="/user.js"></script>
+</body>
+</html>

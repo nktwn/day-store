@@ -1,0 +1,1664 @@
+fastapi-reco
+├── Dockerfile
+├── app
+│   ├── core
+│   │   ├── cache.py
+│   │   ├── config.py
+│   │   └── http_client.py
+│   ├── main.py
+│   ├── models
+│   │   └── dto.py
+│   ├── routers
+│   │   ├── __init__.py
+│   │   ├── health.py
+│   │   ├── java_proxy.py
+│   │   └── search.py
+│   └── services
+│       └── store.py
+├── ass6.tar
+├── docker-compose.yml
+├── project_structure.txt
+├── requirements.txt
+├── static
+│   ├── app.js
+│   ├── cart.html
+│   ├── cart.js
+│   ├── catalog.js
+│   ├── common.js
+│   ├── header.js
+│   ├── index.html
+│   ├── product.html
+│   ├── product.js
+│   ├── styles.css
+│   ├── user.html
+│   └── user.js
+└── x.py
+
+
+# Содержимое Python, JavaScript, HTML и .env файлов
+
+
+--- x.py ---
+import os
+
+def write_tree_and_file_contents(root_dir, output_file):
+    with open(output_file, "w", encoding="utf-8") as f:
+        def walk(dir_path, prefix=""):
+            items = sorted(os.listdir(dir_path))
+            for i, item in enumerate(items):
+                path = os.path.join(dir_path, item)
+
+                if item in {".venv", "__pycache__"} or item.startswith("."):
+                    continue
+
+                connector = "└── " if i == len(items) - 1 else "├── "
+                f.write(prefix + connector + item + "\n")
+                if os.path.isdir(path):
+                    extension = "    " if i == len(items) - 1 else "│   "
+                    walk(path, prefix + extension)
+
+        f.write(f"{os.path.basename(root_dir)}\n")
+        walk(root_dir)
+
+        f.write("\n\n# Содержимое Python, JavaScript, HTML и .env файлов\n\n")
+
+        count = 0
+        for dirpath, _, filenames in os.walk(root_dir):
+            if ".venv" in dirpath.split(os.sep) or "__pycache__" in dirpath:
+                continue
+
+            for filename in filenames:
+                if filename.endswith((".py", ".js", ".html", ".env")):
+                    filepath = os.path.join(dirpath, filename)
+                    relpath = os.path.relpath(filepath, root_dir)
+                    f.write(f"\n--- {relpath} ---\n")
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as source_file:
+                            f.write(source_file.read())
+                            count += 1
+                    except Exception as e:
+                        f.write(f"\n[Ошибка чтения файла: {e}]\n")
+
+        f.write(f"\n\n# Всего файлов записано: {count}\n")
+
+if __name__ == "__main__":
+    current_dir = os.getcwd()
+    write_tree_and_file_contents(current_dir, "project_structure.txt")
+    print("✅ Готово! Смотри файл project_structure.txt")
+
+--- .env ---
+#JAVA_BASE_URL=http://java-service:8080
+JAVA_BASE_URL=http://host.docker.internal:8080
+
+JAVA_SVC_USERNAME=service_bot
+JAVA_SVC_PASSWORD=service_bot_secret
+
+PORT=9000
+
+HTTP_WRITE_TIMEOUT=8
+HTTP_POOL_TIMEOUT=5
+
+--- app/main.py ---
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
+
+from app.core.http_client import java_client
+from app.routers import health, java_proxy
+from app.routers import search as search_router
+
+logger = logging.getLogger("fastapi-reco")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s: %(message)s",
+)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    try:
+        await java_client.ensure_service_user()
+    except Exception as e:
+        logger.warning("[startup] Registration attempt failed: %s", e)
+    logger.info("[startup] FastAPI is up; Java base: %s", java_client.base_url)
+
+    yield
+
+    try:
+        await java_client.aclose()
+    except Exception:
+        pass
+
+app = FastAPI(
+    title="FastAPI Reco Service",
+    version="0.2.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(health.router)
+app.include_router(java_proxy.router)
+app.include_router(search_router.router)
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="127.0.0.1", port=9000, reload=True)
+
+--- app/routers/java_proxy.py ---
+from fastapi import APIRouter, HTTPException, Query, Request
+from app.core.http_client import java_client
+from app.core.cache import TTLCache
+
+router = APIRouter(prefix="/api/v1/java", tags=["java-proxy"])
+_products_cache = TTLCache(ttl_seconds=60)
+
+
+def _auth_from_request(request: Request) -> str | None:
+    return request.headers.get("authorization")
+
+
+def _extra_headers(request: Request) -> dict:
+    x = request.headers.get("x-user") or request.headers.get("x-username")
+    return {"X-User": x} if x else {}
+
+
+def _ensure_auth_or_401(request: Request):
+    if not (_auth_from_request(request) or _extra_headers(request)):
+        raise HTTPException(status_code=401, detail="Authorization required")
+
+
+@router.get("/me/username")
+async def me_username(request: Request):
+    _ensure_auth_or_401(request)
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+
+    async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+        resp = await c.get("/api/v1/users/me/username")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        resp.raise_for_status()
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"Java me/username failed: {resp.text}")
+
+    return {"java_username": resp.text.strip().strip('"')}
+
+
+@router.get("/users/me/history")
+async def me_history(request: Request, limit: int | None = None, all: bool | None = True):
+    _ensure_auth_or_401(request)
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+
+    params = {}
+    if limit is not None:
+        params["limit"] = str(limit)
+    if all is not None:
+        params["all"] = "true" if all else "false"
+
+    async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+        resp = await c.get("/api/v1/users/me/history", params=params)
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        resp.raise_for_status()
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"Java me/history failed: {resp.text}")
+
+    return resp.json()
+
+
+@router.get("/users/me/recommendation")
+async def me_recommendation(request: Request):
+    _ensure_auth_or_401(request)
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+
+    async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+        resp = await c.get("/api/v1/users/me/recommendation")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        resp.raise_for_status()
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"Java recommendation failed: {resp.text}")
+    return resp.json()
+
+
+@router.get("/products")
+async def list_products(request: Request, use_cache: bool = Query(True)):
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+
+    async def producer():
+        async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+            resp = await c.get("/api/v1/products/")
+        if resp.status_code == 401:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        try:
+            resp.raise_for_status()
+        except Exception:
+            raise HTTPException(status_code=502, detail=f"Java products failed: {resp.text}")
+        return resp.json()
+
+    data = await (_products_cache.get_or_set("all_products", producer) if use_cache and not auth else producer())
+    return {"count": len(data), "items": data}
+
+
+@router.get("/products/by-category")
+async def products_by_category(request: Request, category: str = Query(..., description="CSV: LAPTOP,PHONE,...")):
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+
+    categories_csv = ",".join([c.strip().upper() for c in category.split(",") if c.strip()])
+    params = {"category": categories_csv} if categories_csv else {}
+
+    async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+        resp = await c.get("/api/v1/products/by-category", params=params)
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        resp.raise_for_status()
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"Java products/by-category failed: {resp.text}")
+
+    data = resp.json()
+    return {"count": len(data), "items": data}
+
+
+@router.get("/products/{product_id}")
+async def get_product(request: Request, product_id: str):
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+    async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+        resp = await c.get(f"/api/v1/products/{product_id}")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if resp.status_code == 500:
+        raise HTTPException(status_code=404, detail="Product not found")
+    try:
+        resp.raise_for_status()
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"Java product {product_id} failed: {resp.text}")
+    return resp.json()
+
+
+@router.post("/products/{product_id}/like")
+async def like_product(request: Request, product_id: str):
+    _ensure_auth_or_401(request)
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+
+    async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+        resp = await c.post(f"/api/v1/products/{product_id}/like")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if resp.status_code == 500:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if resp.status_code not in (200, 204):
+        raise HTTPException(status_code=502, detail=f"Java like failed: {resp.text}")
+
+    await _products_cache.invalidate("all_products")
+    return {"message": resp.text or "OK"}
+
+
+@router.delete("/products/{product_id}/like")
+async def unlike_product(request: Request, product_id: str):
+    _ensure_auth_or_401(request)
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+
+    async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+        resp = await c.delete(f"/api/v1/products/{product_id}/like")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if resp.status_code == 500:
+        return {"status": 204}
+    if resp.status_code not in (200, 204):
+        raise HTTPException(status_code=502, detail=f"Java unlike failed: {resp.text}")
+
+    await _products_cache.invalidate("all_products")
+    return {"status": resp.status_code}
+
+
+@router.post("/products/{product_id}/buy")
+async def buy_product(request: Request, product_id: str):
+    _ensure_auth_or_401(request)
+    auth = _auth_from_request(request)
+    extra = _extra_headers(request)
+
+    async with java_client.make_client(auth_header=auth, extra_headers=extra) as c:
+        resp = await c.post(f"/api/v1/products/{product_id}/buy")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if resp.status_code == 500:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if resp.status_code not in (200, 204):
+        raise HTTPException(status_code=502, detail=f"Java buy failed: {resp.text}")
+
+    return {"message": resp.text or "OK"}
+
+
+--- app/routers/health.py ---
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/api/v1/health", tags=["health"])
+
+@router.get("")
+async def health():
+    return {"status": "ok"}
+
+--- app/routers/__init__.py ---
+
+--- app/routers/search.py ---
+from fastapi import APIRouter, Query, HTTPException
+from typing import Optional, List
+from app.core.http_client import java_client
+
+router = APIRouter(prefix="/api/v1/search", tags=["search"])
+
+def _match_tokens(s: str, tokens: List[str]) -> bool:
+    s = (s or "").lower()
+    return all(t in s for t in tokens)
+
+@router.get("")
+async def search(
+    q: str = Query(""),
+    category: Optional[str] = None,
+    price_from: Optional[int] = None,
+    price_to: Optional[int] = None,
+    limit: int = Query(50, ge=1, le=200),
+):
+    try:
+        items = await java_client.get_products()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Java products failed: {e}")
+
+    tokens = [t.strip().lower() for t in q.split()] if q else []
+    out = []
+    for it in items:
+        if category and it.get("category") != category:
+            continue
+        price = it.get("price") or 0
+        if price_from is not None and price < price_from:
+            continue
+        if price_to is not None and price > price_to:
+            continue
+        if tokens:
+            hay = " ".join([str(it.get("brand") or ""), str(it.get("model") or "")])
+            if not _match_tokens(hay, tokens):
+                continue
+        out.append(it)
+        if len(out) >= limit:
+            break
+
+    return {"count": len(out), "items": out}
+
+--- app/core/config.py ---
+from pydantic import BaseModel
+import os
+
+class Settings(BaseModel):
+    java_base_url: str = os.getenv("JAVA_BASE_URL", "http://localhost:8080")
+    java_svc_username: str = os.getenv("JAVA_SVC_USERNAME", "service_bot")
+    java_svc_password: str = os.getenv("JAVA_SVC_PASSWORD", "service_bot_secret")
+
+    port: int = int(os.getenv("PORT", "9000"))
+
+    http_connect_timeout: float = float(os.getenv("HTTP_CONNECT_TIMEOUT", "5"))
+    http_read_timeout: float = float(os.getenv("HTTP_READ_TIMEOUT", "8"))
+    http_write_timeout: float = float(os.getenv("HTTP_WRITE_TIMEOUT", "8"))
+    http_pool_timeout: float = float(os.getenv("HTTP_POOL_TIMEOUT", "5"))
+
+settings = Settings()
+
+--- app/core/http_client.py ---
+# app/core/http_client.py
+import base64
+import httpx
+from .config import settings
+
+def make_basic_auth_header(username: str, password: str) -> str:
+    token = base64.b64encode(f"{username}:{password}".encode()).decode()
+    return f"Basic {token}"
+
+class JavaClient:
+
+    def __init__(self) -> None:
+        self.base_url = settings.java_base_url.rstrip("/")
+        self._svc_headers = {
+            "Authorization": make_basic_auth_header(settings.java_svc_username, settings.java_svc_password),
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        self._timeout = httpx.Timeout(
+            connect=settings.http_connect_timeout,
+            read=settings.http_read_timeout,
+            write=settings.http_write_timeout,
+            pool=settings.http_pool_timeout,
+        )
+        self._client = httpx.AsyncClient(
+            base_url=self.base_url,
+            headers=self._svc_headers,
+            timeout=self._timeout,
+        )
+
+    def make_client(self, auth_header: str | None = None, extra_headers: dict | None = None):
+        headers = dict(self._svc_headers)
+        if auth_header is not None:
+            if auth_header == "":
+                headers.pop("Authorization", None)
+            else:
+                headers["Authorization"] = auth_header
+        if extra_headers:
+            headers.update(extra_headers)
+        return httpx.AsyncClient(base_url=self.base_url, headers=headers, timeout=self._timeout)
+
+    async def ensure_service_user(self) -> None:
+        body = {
+            "username": settings.java_svc_username,
+            "password": settings.java_svc_password,
+            "passwordConfirmation": settings.java_svc_password,
+        }
+        try:
+            async with httpx.AsyncClient(base_url=self.base_url, timeout=10) as c:
+                await c.post("/api/v1/users/registration", json=body)
+        except Exception:
+            pass
+
+    async def aclose(self):
+        await self._client.aclose()
+
+    async def get_products(self):
+        resp = await self._client.get("/api/v1/products/")
+        resp.raise_for_status()
+        return resp.json()
+
+    async def get_product_by_id(self, product_id: str):
+        resp = await self._client.get(f"/api/v1/products/{product_id}")
+        resp.raise_for_status()
+        return resp.json()
+
+    async def like_product(self, product_id: str):
+        resp = await self._client.post(f"/api/v1/products/{product_id}/like")
+        resp.raise_for_status()
+        return resp.text
+
+    async def unlike_product(self, product_id: str):
+        resp = await self._client.delete(f"/api/v1/products/{product_id}/like")
+        if resp.status_code not in (200, 204):
+            resp.raise_for_status()
+        return {"status": resp.status_code}
+
+    async def buy_product(self, product_id: str):
+        resp = await self._client.post(f"/api/v1/products/{product_id}/buy")
+        resp.raise_for_status()
+        return resp.text
+
+    async def get_username(self):
+        resp = await self._client.get("/api/v1/users/me/username")
+        resp.raise_for_status()
+        return resp.text.strip('"')
+
+    async def get_categories(self):
+        resp = await self._client.get("/api/v1/categories/")
+        resp.raise_for_status()
+        return resp.text
+
+    async def aclose(self):
+        await self._client.aclose()
+
+java_client = JavaClient()
+
+--- app/core/cache.py ---
+import time
+import asyncio
+from typing import Any, Callable, Dict, Tuple
+
+class TTLCache:
+    def __init__(self, ttl_seconds: int = 60):
+        self.ttl = ttl_seconds
+        self._data: Dict[str, Tuple[float, Any]] = {}
+        self._lock = asyncio.Lock()
+
+    async def get_or_set(self, key: str, producer: Callable[[], Any]):
+        now = time.time()
+        async with self._lock:
+            if key in self._data:
+                ts, val = self._data[key]
+                if now - ts < self.ttl:
+                    return val
+            val = await producer()
+            self._data[key] = (now, val)
+            return val
+
+    async def invalidate(self, key: str | None = None):
+        async with self._lock:
+            if key is None:
+                self._data.clear()
+            else:
+                self._data.pop(key, None)
+
+--- app/models/dto.py ---
+from pydantic import BaseModel
+
+class JavaProduct(BaseModel):
+    id: str
+    brand: str | None = None
+    model: str | None = None
+    price: int | None = None
+    category: str | None = None
+
+--- app/services/store.py ---
+import asyncio
+from typing import Dict, List, Literal, TypedDict
+from collections import defaultdict
+from datetime import datetime
+
+Action = Literal["VIEW", "LIKE", "PURCHASE"]
+
+class Event(TypedDict):
+    user_id: str
+    product_id: str
+    action: Action
+    ts: str
+
+class InMemoryEventStore:
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self.events_by_user: Dict[str, List[Event]] = defaultdict(list)
+        self.popularity: Dict[str, int] = defaultdict(int)
+
+    def _weight(self, action: Action) -> int:
+        if action == "VIEW":
+            return 1
+        if action == "LIKE":
+            return 3
+        if action == "PURCHASE":
+            return 5
+        return 0
+
+    async def ingest(self, evs: List[Event]):
+        async with self._lock:
+            for e in evs:
+                if not e.get("ts"):
+                    e["ts"] = datetime.utcnow().isoformat() + "Z"
+                self.events_by_user[e["user_id"]].append(e)
+                self.popularity[e["product_id"]] += self._weight(e["action"])
+
+    async def user_vector(self, user_id: str) -> Dict[str, int]:
+        async with self._lock:
+            vec: Dict[str, int] = defaultdict(int)
+            for e in self.events_by_user.get(user_id, []):
+                vec[e["product_id"]] += self._weight(e["action"])
+            return dict(vec)
+
+    async def top_popular(self, k: int = 50) -> List[str]:
+        async with self._lock:
+            return [pid for pid, _ in sorted(self.popularity.items(), key=lambda x: x[1], reverse=True)[:k]]
+
+store = InMemoryEventStore()
+
+--- static/index.html ---
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Каталог — Reco Demo</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="site-header"></div>
+<script type="module" src="/header.js"></script>
+
+<main class="container">
+  <section class="panel">
+    <div class="row toolbar">
+      <input id="searchInput" type="text" placeholder="Поиск по бренду/модели/категории…" />
+      <button id="btnSearch" class="btn">Найти</button>
+    </div>
+    <div id="output" class="log mono"></div>
+  </section>
+
+  <section id="recoSection" class="panel" style="display:none;">
+    <div class="panel-title">
+      <h2>Рекомендации для вас</h2>
+      <div id="recoHint" class="muted">Нужна авторизация</div>
+    </div>
+    <div id="recoList" class="grid"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <h2>Фильтр по категориям</h2>
+      <div class="muted">Enum Java: LAPTOP, PC, HEADPHONE, SMART_WATCH, CAMERA, PHONE</div>
+    </div>
+    <div id="catFilters" class="form-row">
+      <label class="chip"><input type="checkbox" value="LAPTOP"> LAPTOP</label>
+      <label class="chip"><input type="checkbox" value="PC"> PC</label>
+      <label class="chip"><input type="checkbox" value="HEADPHONE"> HEADPHONE</label>
+      <label class="chip"><input type="checkbox" value="SMART_WATCH"> SMART_WATCH</label>
+      <label class="chip"><input type="checkbox" value="CAMERA"> CAMERA</label>
+      <label class="chip"><input type="checkbox" value="PHONE"> PHONE</label>
+    </div>
+    <div class="btn-row">
+      <button id="btnApplyCats" class="btn outline">Применить фильтр</button>
+      <button id="btnResetCats" class="btn ghost">Сбросить</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <h2>Каталог</h2>
+    </div>
+    <div id="products" class="grid"></div>
+  </section>
+</main>
+
+<script type="module" src="/common.js"></script>
+<script type="module" src="/catalog.js"></script>
+</body>
+</html>
+
+--- static/product.html ---
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Товар — Reco Demo</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="site-header"></div>
+<script type="module" src="/header.js"></script>
+
+<main class="container">
+  <section id="productBox"></section>
+
+  <section>
+    <h3>Результат</h3>
+    <pre id="output" class="log"></pre>
+  </section>
+</main>
+
+<script type="module" src="/common.js"></script>
+<script type="module" src="/product.js"></script>
+</body>
+</html>
+
+--- static/cart.js ---
+import { cartList, cartRemove, cartClear, reflectAuthStatus, fetchJSON, getAuthToken, out } from "./common.js";
+
+function render() {
+  reflectAuthStatus();
+  const items = cartList();
+  const wrap = document.getElementById("cartList");
+  if (!wrap) return;
+  if (!items.length) {
+    wrap.innerHTML = `<div class="muted">Корзина пуста</div>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <table class="table">
+      <thead><tr><th>Товар</th><th>Цена</th><th></th></tr></thead>
+      <tbody>
+      ${items.map(it => `
+        <tr>
+          <td>${it.brand || "?"} — ${it.model || "?"}<div class="mono">id: ${it.id}</div></td>
+          <td>${it.price ?? "-"}</td>
+          <td><button class="btn ghost rm" data-id="${it.id}">Удалить</button></td>
+        </tr>
+      `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+async function checkout() {
+  const items = cartList();
+  if (!items.length) return out("Корзина пуста");
+  if (!getAuthToken()) return out("Нужна авторизация (страница Пользователь)");
+
+  let ok = 0, fail = 0;
+  for (const it of items) {
+    try {
+      await fetchJSON(`/api/v1/java/products/${it.id}/buy`, { method: "POST" });
+      ok++;
+    } catch (e) {
+      fail++;
+      out(`Ошибка для ${it.id}: ${e.message}`);
+    }
+  }
+  out(`Оформлено: ${ok}, ошибок: ${fail}`);
+  render();
+}
+
+function onClick(e) {
+  const rm = e.target.closest("button.rm");
+  if (rm) {
+    cartRemove(rm.dataset.id);
+    render();
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  render();
+  document.getElementById("btnCheckout").addEventListener("click", checkout);
+  document.getElementById("btnClear").addEventListener("click", () => { cartClear(); render(); });
+  document.addEventListener("click", onClick);
+});
+
+--- static/user.js ---
+import { fetchJSON, out, makeBasic, setAuthToken, getAuthToken } from "./common.js";
+
+function renderPretty(data) {
+  const box = document.getElementById("pretty");
+  if (!box) return;
+  if (!data) { box.innerHTML = ""; return; }
+
+  if (typeof data === "string") {
+    box.innerHTML = `<div class="chip">${data}</div>`;
+    return;
+  }
+  if (Array.isArray(data)) {
+    if (data.length === 0) { box.innerHTML = `<div class="muted">пусто</div>`; return; }
+    box.innerHTML = `
+      <table class="table">
+        <thead><tr><th>ts</th><th>action</th><th>productId</th><th>category</th></tr></thead>
+        <tbody>
+          ${data.map(a => `
+            <tr>
+              <td>${a.timestamp ?? "-"}</td>
+              <td>${a.action ?? "-"}</td>
+              <td>${a.productId ?? "-"}</td>
+              <td>${a.category ?? "-"}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+    return;
+  }
+  if (typeof data === "object" && data.java_username) {
+    box.innerHTML = `<div class="big-chip">👤 ${data.java_username}</div>`;
+    return;
+  }
+  box.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+}
+
+async function onRegister() {
+  const u = document.getElementById("regUser").value.trim();
+  const p = document.getElementById("regPass").value;
+  if (!u || !p) return renderPretty("Введите username и password для регистрации");
+  try {
+    const res = await fetchJSON(`/api/v1/java/users/registration`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: u, password: p, passwordConfirmation: p })
+    });
+    renderPretty(res);
+  } catch (e) {
+    renderPretty(e.message);
+  }
+}
+
+async function onLogin() {
+  const u = document.getElementById("loginUser").value.trim();
+  const p = document.getElementById("loginPass").value;
+  if (!u || !p) return renderPretty("Введите username и password для логина");
+  const token = makeBasic(u, p);
+  try {
+    const r = await fetch(`/api/v1/java/me/username`, { headers: { "Authorization": token } });
+    if (!r.ok) throw new Error(`Login failed: HTTP ${r.status}: ${await r.text()}`);
+    setAuthToken(token);
+    const payload = await r.json().catch(async () => ({ java_username: await r.text() }));
+    renderPretty({ login: "ok", ...payload });
+  } catch (e) {
+    setAuthToken("");
+    renderPretty(e.message);
+  }
+}
+
+function onLogout() {
+  setAuthToken("");
+  renderPretty("logged out");
+}
+
+async function onWhoAmI() {
+  if (!getAuthToken()) return renderPretty("Unauthorized: войдите");
+  try {
+    const data = await fetchJSON(`/api/v1/java/me/username`);
+    renderPretty(data);
+  } catch (e) {
+    renderPretty(e.message);
+  }
+}
+
+async function onHistory() {
+  if (!getAuthToken()) return renderPretty("Unauthorized: войдите");
+  try {
+    const data = await fetchJSON(`/api/v1/java/users/me/history?all=true`);
+    renderPretty(data);
+  } catch (e) {
+    renderPretty(e.message);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btnRegister").addEventListener("click", onRegister);
+  document.getElementById("btnLogin").addEventListener("click", onLogin);
+  document.getElementById("btnLogout").addEventListener("click", onLogout);
+  document.getElementById("btnWhoAmI").addEventListener("click", onWhoAmI);
+  document.getElementById("btnHistory").addEventListener("click", onHistory);
+});
+
+--- static/catalog.js ---
+import { fetchJSON, out, reflectAuthStatus, getAuthToken } from "./common.js";
+
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+async function loadProducts({ useCache = false } = {}) {
+  try {
+    const data = await fetchJSON(
+      `/api/v1/java/products?use_cache=${useCache ? "true" : "false"}`
+    );
+    renderProducts(data.items || []);
+    await maybeLoadRecommendations();
+  } catch (e) {
+    out(e.message);
+  }
+}
+
+function renderProducts(items) {
+  const wrap = document.getElementById("products");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  items.forEach((p) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="card-head">
+        <h3>${escapeHtml(p.brand || "?")} — ${escapeHtml(p.model || "?")}</h3>
+        <a class="link" href="/product.html?id=${encodeURIComponent(p.id)}">Открыть</a>
+      </div>
+      <div class="mono">id: ${escapeHtml(p.id || "")}</div>
+      <div>Категория: <b>${escapeHtml(p.category || "-")}</b></div>
+      <div>Цена: <b class="price">${p.price ?? "-"}</b></div>
+      <div class="actions">
+        <button class="btn outline action" data-act="view" data-id="${p.id}">View</button>
+        <button class="btn action" data-act="like" data-id="${p.id}">Like</button>
+        <button class="btn ghost action" data-act="unlike" data-id="${p.id}">Unlike</button>
+        <button class="btn success action" data-act="buy" data-id="${p.id}">Buy</button>
+      </div>
+    `;
+    wrap.appendChild(card);
+  });
+}
+
+async function onAction(e) {
+  const btn = e.target.closest("button.action");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const pid = btn.dataset.id;
+
+  try {
+    if (act === "view") {
+      const data = await fetchJSON(`/api/v1/java/products/${pid}`);
+      out(data);
+    } else if (act === "like") {
+      const data = await fetchJSON(`/api/v1/java/products/${pid}/like`, {
+        method: "POST",
+      });
+      out(data);
+    } else if (act === "unlike") {
+      const data = await fetchJSON(`/api/v1/java/products/${pid}/like`, {
+        method: "DELETE",
+      });
+      out(data);
+    } else if (act === "buy") {
+      const data = await fetchJSON(`/api/v1/java/products/${pid}/buy`, {
+        method: "POST",
+      });
+      out(data);
+    }
+  } catch (err) {
+    out(err.message);
+  }
+}
+
+async function onSearch() {
+  const q = document.getElementById("searchInput")?.value.trim() || "";
+  try {
+    const data = await fetchJSON(`/api/v1/search?q=${encodeURIComponent(q)}`);
+    renderProducts(data.items || []);
+    out({ search: q, count: data.count });
+  } catch (e) {
+    out(e.message);
+  }
+}
+
+async function maybeLoadRecommendations() {
+  const sec  = document.getElementById("recoSection");
+  const list = document.getElementById("recoList");
+  const hint = document.getElementById("recoHint");
+  if (!sec || !list) return;
+
+  if (!getAuthToken()) {
+    sec.style.display = "none";
+    return;
+  }
+
+  try {
+    const data = await fetchJSON(`/api/v1/java/users/me/recommendation`);
+    const items = Array.isArray(data?.items)
+      ? data.items
+      : Array.isArray(data)
+      ? data
+      : [];
+    list.innerHTML = "";
+
+    if (!items.length) {
+      list.innerHTML = `<div class="muted">Нет рекомендаций</div>`;
+    } else {
+      items.forEach((p) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="card-head">
+            <h3>${escapeHtml(p.brand || "?")} — ${escapeHtml(p.model || "?")}</h3>
+            <a class="link" href="/product.html?id=${encodeURIComponent(p.id)}">Открыть</a>
+          </div>
+          <div class="mono">id: ${escapeHtml(p.id || "")}</div>
+          <div>Категория: <b>${escapeHtml(p.category || "-")}</b></div>
+          <div>Цена: <b>${p.price ?? "-"}</b></div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    if (hint) hint.textContent = "Показаны персональные рекомендации";
+    sec.style.display = "";
+  } catch (e) {
+    sec.style.display = "none";
+  }
+}
+
+function selectedCategories() {
+  const boxWrap = document.getElementById("catFilters");
+  if (!boxWrap) return [];
+  const inputs = [...boxWrap.querySelectorAll('input[type="checkbox"]')];
+  return inputs
+    .filter((i) => i.checked)
+    .map((i) => i.value.trim().toUpperCase());
+}
+
+async function applyCategoryFilter() {
+  const cats = selectedCategories();
+  if (!cats.length) {
+    await loadProducts({ useCache: false });
+    return;
+  }
+  const csv = cats.join(",");
+  try {
+    const data = await fetchJSON(
+      `/api/v1/java/products/by-category?category=${encodeURIComponent(csv)}`
+    );
+    renderProducts(data.items || []);
+    out({ filter: cats, count: data.count });
+  } catch (e) {
+    out(e.message);
+  }
+}
+
+function resetCategoryFilter() {
+  const boxWrap = document.getElementById("catFilters");
+  if (boxWrap) {
+    boxWrap
+      .querySelectorAll('input[type="checkbox"]')
+      .forEach((i) => (i.checked = false));
+  }
+  loadProducts({ useCache: false }).catch(console.error);
+}
+
+document.addEventListener("click", onAction);
+
+const btnSearch = document.getElementById("btnSearch");
+if (btnSearch) btnSearch.addEventListener("click", onSearch);
+
+const btnApplyCats = document.getElementById("btnApplyCats");
+if (btnApplyCats) btnApplyCats.addEventListener("click", applyCategoryFilter);
+
+const btnResetCats = document.getElementById("btnResetCats");
+if (btnResetCats) btnResetCats.addEventListener("click", resetCategoryFilter);
+
+reflectAuthStatus();
+loadProducts({ useCache: false }).catch(console.error);
+
+--- static/user.html ---
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Пользователь — Reco Demo</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="site-header"></div>
+<script type="module" src="/header.js"></script>
+
+<main class="container narrow">
+  <section class="panel">
+    <h2>Регистрация</h2>
+    <div class="form-row">
+      <input id="regUser" placeholder="username" />
+      <input id="regPass" type="password" placeholder="password" />
+      <button id="btnRegister" class="btn">Зарегистрироваться</button>
+    </div>
+  </section>
+
+<section class="panel">
+  <h2>Логин (Basic)</h2>
+  <div class="form-row">
+    <input id="loginUser" placeholder="username" />
+    <input id="loginPass" type="password" placeholder="password" />
+    <button id="btnLogin" class="btn">Войти</button>
+    <button id="btnLogout" class="btn ghost">Выйти</button>
+  </div>
+</section>
+
+
+  <section class="panel">
+    <h2>Действия</h2>
+    <div class="btn-row">
+      <button id="btnWhoAmI" class="btn">Who am I</button>
+      <button id="btnHistory" class="btn">History</button>
+    </div>
+  </section>
+
+  <section>
+    <h3>Результат</h3>
+    <div id="pretty" class="pretty"></div>
+    <pre id="output" class="log hidden"></pre>
+  </section>
+</main>
+
+<script type="module" src="/common.js"></script>
+<script type="module" src="/user.js"></script>
+</body>
+</html>
+
+--- static/header.js ---
+function renderHeader() {
+  const container = document.getElementById("site-header");
+  if (!container) return;
+
+  container.innerHTML = `
+    <header class="topbar">
+      <div class="brand"><a href="/" class="brand-link">Reco Demo</a></div>
+      <nav>
+        <a href="/" data-nav="catalog">Каталог</a>
+        <a href="/user.html" data-nav="user">Профиль</a>
+        <a href="/cart.html" data-nav="cart">Корзина (<span data-cart-count>0</span>)</a>
+      </nav>
+      <div class="status">status: <span data-auth-status>anonymous</span></div>
+    </header>
+  `;
+
+  const path = (location.pathname || "/").toLowerCase();
+  const navMap = {
+    "/": "catalog",
+    "/index.html": "catalog",
+    "/product.html": "catalog",
+    "/user.html": "user",
+    "/cart.html": "cart",
+  };
+
+  const active = navMap[path] || "catalog";
+  container.querySelectorAll('nav a').forEach(a => {
+    if (a.dataset.nav === active) a.classList.add("active");
+    else a.classList.remove("active");
+  });
+
+  const styleId = "shared-header-inline-fix";
+  if (!document.getElementById(styleId)) {
+    const s = document.createElement("style");
+    s.id = styleId;
+    s.textContent = `
+      .topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 16px; background:var(--panel,#fff); box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.05)); position:sticky; top:0; z-index:10; }
+      .topbar .brand { font-weight:700; }
+      .topbar .brand .brand-link { text-decoration: none; color: inherit; }
+      .topbar nav { display:flex; gap:12px; align-items:center; }
+      .topbar nav a { text-decoration:none; color:var(--text,#1e2433); padding:6px 10px; border-radius:8px; }
+      .topbar nav a.active { background:var(--soft,#f1f4f9); color: var(--brand,#2563eb); }
+      .topbar .status { font-size: 14px; color: var(--muted,#65708a); }
+    `;
+    document.head.appendChild(s);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", renderHeader);
+
+--- static/common.js ---
+const LS_AUTH = "AUTH";
+const LS_AUTH_TS = "AUTH_TS";
+const SESSION_TTL_MS = 10 * 60 * 1000;
+
+function nowMs() { return Date.now(); }
+function isExpired(ts) { return !ts || (nowMs() - ts) > SESSION_TTL_MS; }
+
+export function getAuthToken() {
+  const token = localStorage.getItem(LS_AUTH) || "";
+  const ts = parseInt(localStorage.getItem(LS_AUTH_TS) || "0", 10);
+  if (!token) return "";
+  if (isExpired(ts)) {
+    localStorage.removeItem(LS_AUTH);
+    localStorage.removeItem(LS_AUTH_TS);
+    reflectAuthStatus();
+    return "";
+  }
+  return token;
+}
+function touch() { localStorage.setItem(LS_AUTH_TS, String(nowMs())); }
+
+export function setAuthToken(token) {
+  if (token) { localStorage.setItem(LS_AUTH, token); touch(); }
+  else { localStorage.removeItem(LS_AUTH); localStorage.removeItem(LS_AUTH_TS); }
+  reflectAuthStatus();
+}
+
+export function makeBasic(u, p) { return "Basic " + btoa(`${u}:${p}`); }
+
+export function reflectAuthStatus() {
+  const el = document.querySelector("[data-auth-status]");
+  if (el) {
+    const tok = getAuthToken();
+    el.textContent = tok ? "authorized" : "anonymous";
+    el.style.color = tok ? "#06d6a0" : "#ffd166";
+  }
+  const cc = document.querySelectorAll("[data-cart-count]");
+  cc.forEach(e => e.textContent = String(cartCount()));
+}
+
+function attachAuth(opts = {}) {
+  opts.headers = opts.headers || {};
+  const tok = getAuthToken();
+  if (tok && !opts.headers["Authorization"]) {
+    opts.headers["Authorization"] = tok;
+    touch();
+  }
+  return opts;
+}
+export async function fetchJSON(url, opts = {}) {
+  const withAuth = attachAuth(opts);
+  const r = await fetch(url, withAuth);
+  if (!r.ok) {
+    const txt = await r.text();
+    if (r.status === 401 || r.status === 403) {
+      setAuthToken("");
+      throw new Error("Unauthorized: войдите на странице Пользователь");
+    }
+    throw new Error(`HTTP ${r.status}: ${txt}`);
+  }
+  const ct = r.headers.get("content-type") || "";
+  return ct.includes("application/json") ? r.json() : r.text();
+}
+
+export function out(msg, id = "output") {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (typeof msg === "string") el.textContent = msg; else el.textContent = JSON.stringify(msg, null, 2);
+}
+
+const LS_CART = "CART_V1";
+function readCart() {
+  try { return JSON.parse(localStorage.getItem(LS_CART) || "[]"); } catch { return []; }
+}
+function writeCart(items) { localStorage.setItem(LS_CART, JSON.stringify(items)); reflectAuthStatus(); }
+export function cartList() { return readCart(); }
+export function cartCount() { return readCart().length; }
+export function cartAdd(item) {
+  const items = readCart();
+  if (!items.find(x => x.id === item.id)) { items.push(item); writeCart(items); }
+}
+export function cartRemove(id) {
+  writeCart(readCart().filter(x => x.id !== id));
+}
+export function cartClear() { writeCart([]); }
+
+document.addEventListener("DOMContentLoaded", reflectAuthStatus);
+
+--- static/cart.html ---
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Корзина — Reco Demo</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="site-header"></div>
+<script type="module" src="/header.js"></script>
+
+<main class="container narrow">
+  <section class="panel">
+    <h2>Ваши товары</h2>
+    <div id="cartList"></div>
+    <div class="btn-row" style="margin-top:12px">
+      <button id="btnCheckout" class="btn">Оформить покупку</button>
+      <button id="btnClear" class="btn ghost">Очистить корзину</button>
+    </div>
+  </section>
+
+  <section>
+    <h3>Результат</h3>
+    <pre id="output" class="log"></pre>
+  </section>
+</main>
+
+<script type="module" src="/common.js"></script>
+<script type="module" src="/cart.js"></script>
+</body>
+</html>
+
+--- static/product.js ---
+import { fetchJSON, out, getAuthToken, cartAdd } from "./common.js";
+
+function getId() {
+  return new URL(location.href).searchParams.get("id") || "";
+}
+
+function isLoggedIn() {
+  return !!getAuthToken();
+}
+
+function renderSkeleton(id) {
+  const el = document.getElementById("productBox");
+  el.innerHTML = `
+    <div class="card big">
+      <h2 id="pTitle">Загрузка...</h2>
+      <div class="mono">id: ${id}</div>
+
+      <div id="pInfo" class="kv">
+        <div><span>Категория:</span><b>—</b></div>
+        <div><span>Цена:</span><b>—</b></div>
+        <div id="pStatus" class="muted">Ожидаем данные с сервера</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" data-act="view">View</button>
+        <button class="btn need-auth" data-act="like" title="Требуется авторизация">Like</button>
+        <button class="btn need-auth" data-act="unlike" title="Требуется авторизация">Unlike</button>
+        <button class="btn" data-act="cart" data-brand="" data-model="" data-price="">Add to Cart</button>
+        <button class="btn need-auth" data-act="buy" title="Требуется авторизация">Buy</button>
+      </div>
+    </div>
+  `;
+  reflectAuthOnButtons();
+}
+
+function reflectAuthOnButtons() {
+  const needAuthButtons = document.querySelectorAll(".need-auth");
+  needAuthButtons.forEach(btn => {
+    if (isLoggedIn()) {
+      btn.classList.remove("disabled");
+      btn.removeAttribute("disabled");
+      btn.title = "";
+    } else {
+      btn.classList.add("disabled");
+      btn.setAttribute("disabled", "disabled");
+      btn.title = "Требуется авторизация";
+    }
+  });
+}
+
+function hydrateProduct(p) {
+  const title = document.getElementById("pTitle");
+  const info = document.getElementById("pInfo");
+  const btnCart = document.querySelector('button[data-act="cart"]');
+
+  if (title) title.textContent = `${p.brand || "?"} — ${p.model || "?"}`;
+  if (info) {
+    info.innerHTML = `
+      <div><span>Категория:</span><b>${p.category || "-"}</b></div>
+      <div><span>Цена:</span><b>${p.price ?? "-"}</b></div>
+      <div id="pStatus" class="muted">Готово</div>
+    `;
+  }
+  if (btnCart) {
+    btnCart.dataset.brand = p.brand || "";
+    btnCart.dataset.model = p.model || "";
+    btnCart.dataset.price = p.price ?? "";
+  }
+}
+
+function showNotFound() {
+  const title = document.getElementById("pTitle");
+  const status = document.getElementById("pStatus");
+  if (title) title.textContent = "Товар не найден";
+  if (status) status.textContent = "Проверьте корректность id";
+}
+
+async function load() {
+  const id = getId();
+  if (!id) {
+    out("Не указан id продукта");
+    return;
+  }
+  renderSkeleton(id);
+  try {
+    const data = await fetchJSON(`/api/v1/java/products/${encodeURIComponent(id)}`);
+    hydrateProduct(data);
+  } catch (e) {
+    showNotFound();
+    out(e.message);
+  }
+}
+
+async function onAction(e) {
+  const btn = e.target.closest("button.btn");
+  if (!btn) return;
+
+  const act = btn.dataset.act;
+  const id = getId();
+
+  try {
+    if (act === "view") {
+      const data = await fetchJSON(`/api/v1/java/products/${id}`);
+      out(data);
+
+    } else if (act === "like") {
+      if (!isLoggedIn()) return out("Нужна авторизация");
+      const data = await fetchJSON(`/api/v1/java/products/${id}/like`, { method: "POST" });
+      out(data);
+
+    } else if (act === "unlike") {
+      if (!isLoggedIn()) return out("Нужна авторизация");
+      // по контракту Java должно быть 204; мы нормализуем 500 → 204 на прокси
+      const res = await fetchJSON(`/api/v1/java/products/${id}/like`, { method: "DELETE" });
+      out(typeof res === "string" ? res : "unliked (204)");
+
+    } else if (act === "cart") {
+      cartAdd({
+        id,
+        brand: btn.dataset.brand || "",
+        model: btn.dataset.model || "",
+        price: btn.dataset.price ? Number(btn.dataset.price) : null
+      });
+      out("Добавлено в корзину");
+
+    } else if (act === "buy") {
+      if (!isLoggedIn()) return out("Нужна авторизация");
+      const data = await fetchJSON(`/api/v1/java/products/${id}/buy`, { method: "POST" });
+      out(data);
+    }
+  } catch (err) {
+    out(err.message);
+  }
+}
+
+window.addEventListener("storage", (ev) => {
+  if (ev.key === "AUTH_TOKEN") reflectAuthOnButtons();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("click", onAction);
+  load();
+});
+
+--- static/app.js ---
+
+(function () {
+
+  const out = (msg) => {
+    const el = document.getElementById("output");
+    el.textContent = (typeof msg === "string") ? msg : JSON.stringify(msg, null, 2);
+  };
+
+
+  function getAuthToken() { return localStorage.getItem("AUTH") || ""; }
+  function setAuthToken(token) {
+    if (token) localStorage.setItem("AUTH", token);
+    else localStorage.removeItem("AUTH");
+    reflectAuthStatus();
+    updateControlsState();
+  }
+  function makeBasic(u, p) { return "Basic " + btoa(`${u}:${p}`); }
+
+  function reflectAuthStatus() {
+    const span = document.getElementById("authStatus");
+    const tok = getAuthToken();
+    if (!span) return;
+    if (!tok) { span.textContent = "anonymous"; span.style.color = "#ffd166"; }
+    else { span.textContent = "authorized"; span.style.color = "#06d6a0"; }
+  }
+
+  function updateControlsState() {
+    const authed = !!getAuthToken();
+    const btnWho = document.getElementById("btnWhoAmI");
+    const btnHist = document.getElementById("btnHistory");
+    const actions = document.querySelectorAll("button.action");
+
+    if (btnWho) btnWho.disabled = !authed;
+    if (btnHist) btnHist.disabled = !authed;
+
+    actions.forEach(b => {
+      const act = b.dataset.act;
+      b.disabled = (act !== "view" && !authed);
+    });
+  }
+
+
+  async function fetchJSON(url, opts = {}) {
+    opts.headers = opts.headers || {};
+    const auth = getAuthToken();
+    if (auth && !opts.headers["Authorization"]) {
+      opts.headers["Authorization"] = auth;
+    }
+    const r = await fetch(url, opts);
+    if (!r.ok) {
+      const txt = await r.text();
+      if (r.status === 401 || r.status === 403) {
+        throw new Error("Unauthorized: введите логин и пароль (Basic)");
+      }
+      throw new Error(`HTTP ${r.status}: ${txt}`);
+    }
+    const ct = r.headers.get("content-type") || "";
+    return ct.includes("application/json") ? r.json() : r.text();
+  }
+
+  async function loadProducts() {
+    try {
+      const useCache = getAuthToken() ? "false" : "true";
+      const data = await fetchJSON(`/api/v1/java/products?use_cache=${useCache}`);
+      renderProducts(data.items || []);
+      updateControlsState();
+    } catch (e) {
+      out(e.message);
+    }
+  }
+
+  function renderProducts(items) {
+    const wrap = document.getElementById("products");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    items.forEach(p => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <h3>${p.brand || "?"} — ${p.model || "?"}</h3>
+        <div class="mono">id: ${p.id}</div>
+        <div>Категория: <b>${p.category || "-"}</b></div>
+        <div>Цена: <b>${p.price ?? "-"}</b></div>
+        <div class="actions">
+          <button class="action" data-act="view" data-id="${p.id}">Открыть</button>
+          <button class="action" data-act="like" data-id="${p.id}">Like</button>
+          <button class="action" data-act="unlike" data-id="${p.id}">Unlike</button>
+          <button class="action" data-act="buy" data-id="${p.id}">Buy</button>
+        </div>
+      `;
+      wrap.appendChild(card);
+    });
+  }
+
+  async function onAction(e) {
+    const btn = e.target.closest("button.action");
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const pid = btn.dataset.id;
+
+    if ((act === "like" || act === "unlike" || act === "buy") && !getAuthToken()) {
+      out("Unauthorized: сначала войдите (Basic)");
+      return;
+    }
+
+    try {
+      if (act === "view") {
+        const data = await fetchJSON(`/api/v1/java/products/${pid}`);
+        out(data);
+      } else if (act === "like") {
+        const data = await fetchJSON(`/api/v1/java/products/${pid}/like`, { method: "POST" });
+        out(data);
+      } else if (act === "unlike") {
+        const data = await fetchJSON(`/api/v1/java/products/${pid}/like`, { method: "DELETE" });
+        out(data);
+      } else if (act === "buy") {
+        const data = await fetchJSON(`/api/v1/java/products/${pid}/buy`, { method: "POST" });
+        out(data);
+      }
+    } catch (err) {
+      out(err.message);
+    }
+  }
+
+  async function onSearch() {
+    const inp = document.getElementById("searchInput");
+    const q = inp ? inp.value.trim() : "";
+    try {
+      const data = await fetchJSON(`/api/v1/search?q=${encodeURIComponent(q)}`);
+      renderProducts(data.items || []);
+      out({ search: q, count: data.count });
+      updateControlsState();
+    } catch (e) {
+      out(e.message);
+    }
+  }
+
+
+  async function onRegister() {
+    const u = document.getElementById("authUser")?.value.trim();
+    const p = document.getElementById("authPass")?.value;
+    if (!u || !p) return out("Введите username и password для регистрации");
+    try {
+      const res = await fetchJSON(`/api/v1/java/users/registration`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: u, password: p, passwordConfirmation: p })
+      });
+      out(res);
+    } catch (e) {
+      out(e.message);
+    }
+  }
+
+  async function onLogin() {
+    const u = document.getElementById("authUser")?.value.trim();
+    const p = document.getElementById("authPass")?.value;
+    if (!u || !p) return out("Введите username и password для логина");
+    const token = makeBasic(u, p);
+    try {
+      const r = await fetch(`/api/v1/java/me/username`, { headers: { "Authorization": token } });
+      if (!r.ok) {
+        const txt = await r.text();
+        throw new Error(`Login failed: HTTP ${r.status}: ${txt}`);
+      }
+      setAuthToken(token);
+      const data = await r.json().catch(async () => ({ java_username: await r.text() }));
+      out({ login: "ok", whoami: data });
+      await loadProducts();
+    } catch (e) {
+      setAuthToken("");
+      out(e.message);
+    }
+  }
+
+  function onLogout() {
+    setAuthToken("");
+    out("logged out");
+    updateControlsState();
+  }
+
+  async function whoAmI() {
+    if (!getAuthToken()) { out("Unauthorized: войдите (Basic)"); return; }
+    try {
+      const data = await fetchJSON(`/api/v1/java/me/username`);
+      out(data);
+    } catch (e) {
+      out(e.message);
+    }
+  }
+
+  async function myHistory() {
+    if (!getAuthToken()) { out("Unauthorized: войдите (Basic)"); return; }
+    try {
+      const data = await fetchJSON(`/api/v1/java/users/me/history?all=true`);
+      out(data);
+    } catch (e) {
+      out(e.message);
+    }
+  }
+
+
+  document.addEventListener("DOMContentLoaded", () => {
+
+    document.addEventListener("click", onAction);
+
+    document.getElementById("btnSearch")?.addEventListener("click", onSearch);
+    document.getElementById("btnRegister")?.addEventListener("click", onRegister);
+    document.getElementById("btnLogin")?.addEventListener("click", onLogin);
+    document.getElementById("btnLogout")?.addEventListener("click", onLogout);
+    document.getElementById("btnWhoAmI")?.addEventListener("click", whoAmI);
+    document.getElementById("btnHistory")?.addEventListener("click", myHistory);
+
+    reflectAuthStatus();
+    loadProducts().finally(updateControlsState);
+  });
+
+})();
+
+
+# Всего файлов записано: 23
