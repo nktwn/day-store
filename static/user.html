@@ -29,11 +29,15 @@
     <div class="grid cols-2" style="gap:24px;">
 
       <div class="u-col" style="gap:24px;">
-        <div class="card big fade-in">
-          <h3 style="margin:0 0 12px">🔐 Вход</h3>
-          <div class="u-col">
-            <input id="loginUser" class="input" placeholder="Имя пользователя" />
-            <input id="loginPass" class="input" type="password" placeholder="Пароль" />
+
+        <div class="card big fade-in"
+             style="min-height:220px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div>
+            <h3 style="margin:0 0 12px">🔐 Вход</h3>
+            <div class="u-col">
+              <input id="loginUser" class="input" placeholder="Имя пользователя" />
+              <input id="loginPass" class="input" type="password" placeholder="Пароль" />
+            </div>
           </div>
           <div class="btn-row" style="margin-top:10px;">
             <button id="btnLogin" class="btn">Войти</button>
@@ -41,18 +45,33 @@
           </div>
         </div>
 
-        <div class="card big fade-in">
-          <h3 style="margin:0 0 12px">✨ Регистрация</h3>
-          <div class="u-col">
-            <input id="regUser" class="input" placeholder="Имя пользователя" />
-            <input id="regPass" class="input" type="password" placeholder="Пароль" />
-            <input id="regPass2" class="input" type="password" placeholder="Подтвердите пароль" />
-            <button id="btnRegister" class="btn block">Создать аккаунт</button>
+        <div class="card big fade-in"
+             style="min-height:220px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div>
+            <h3 style="margin:0 0 12px">✨ Регистрация</h3>
+            <div class="u-col">
+              <input id="regUser" class="input" placeholder="Имя пользователя" />
+              <input id="regPass" class="input" type="password" placeholder="Пароль" />
+              <input id="regPass2" class="input" type="password" placeholder="Подтвердите пароль" />
+            </div>
+          </div>
+          <button id="btnRegister" class="btn block" style="margin-top:10px;">Создать аккаунт</button>
+        </div>
+
+        <div class="card big fade-in" id="adminUsersBox" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0">👥 Список пользователей (admin)</h3>
+            <button id="btnReloadUsers" class="btn outline small">Обновить</button>
+          </div>
+          <div id="adminUsersContent" style="max-height:400px;overflow-y:auto;">
+            <div class="muted">Доступно только пользователю admin</div>
           </div>
         </div>
+
       </div>
 
       <div class="u-col" style="gap:24px;">
+
         <div class="card big fade-in">
           <h3 style="margin:0 0 12px">👤 Информация о пользователе</h3>
           <div id="userInfo" class="u-col">
@@ -75,18 +94,8 @@
             <h3 style="margin:0">🛒 История покупок</h3>
             <button id="btnPurchases" class="btn outline small">Обновить</button>
           </div>
-          <div id="purchasesContent" style="max-height:400px;overflow-y:auto;">
+          <div id="purchasesContent" style="max-height:400px;overflow-y:auto%;">
             <div class="muted">Войдите, чтобы увидеть историю покупок</div>
-          </div>
-        </div>
-
-        <div class="card big fade-in" id="adminUsersBox" style="display:none;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <h3 style="margin:0">👥 Список пользователей (admin)</h3>
-            <button id="btnReloadUsers" class="btn outline small">Обновить</button>
-          </div>
-          <div id="adminUsersContent" style="max-height:400px;overflow-y:auto;">
-            <div class="muted">Доступно только пользователю admin</div>
           </div>
         </div>
 

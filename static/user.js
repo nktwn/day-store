@@ -1,5 +1,7 @@
 import { fetchJSON, makeBasic, setAuthToken, getAuthToken } from "./common.js";
 
+const LS_AUTH_USER = "AUTH_USER";
+
 function showHTML(html) {
   const box = document.getElementById("pretty");
   const panel = document.getElementById("messagesPanel");
@@ -14,9 +16,7 @@ function showHTML(html) {
   }
 }
 
-
 let IS_ADMIN = false;
-
 
 function formatAction(action) {
   switch (action) {
@@ -30,7 +30,6 @@ function formatAction(action) {
       return action || "-";
   }
 }
-
 
 async function onRegister() {
   const username = document.getElementById("regUser").value.trim();
@@ -76,8 +75,7 @@ async function onRegister() {
       try {
         const errorJson = JSON.parse(errorText);
         errorMsg = errorJson.detail || errorText;
-      } catch (e) {
-      }
+      } catch (e) {}
       throw new Error(errorMsg);
     }
 
@@ -123,10 +121,12 @@ async function loadAdminUsers() {
       return;
     }
 
-    const rows = users.map(u => `
+    const rows = users
+      .map(
+        (u) => `
       <tr>
         <td>${u.username}</td>
-        <td class="mono">${u.id ? u.id.substring(0,8) + "..." : "-"}</td>
+        <td class="mono">${u.id ? u.id.substring(0, 8) + "..." : "-"}</td>
         <td>
           <button class="btn outline small btn-admin-pass" data-id="${u.id}" data-username="${u.username}">
             Update password
@@ -136,7 +136,9 @@ async function loadAdminUsers() {
           </button>
         </td>
       </tr>
-    `).join("");
+    `
+      )
+      .join("");
 
     box.innerHTML = `
       <table class="table compact">
@@ -156,7 +158,6 @@ async function loadAdminUsers() {
   }
 }
 
-
 async function onLogin() {
   const username = document.getElementById("loginUser").value.trim();
   const password = document.getElementById("loginPass").value;
@@ -171,7 +172,7 @@ async function onLogin() {
   try {
     const response = await fetch(`/api/v1/users/me/username`, {
       headers: {
-        "Authorization": token
+        Authorization: token
       }
     });
 
@@ -181,8 +182,7 @@ async function onLogin() {
         const errorText = await response.text();
         const errorJson = JSON.parse(errorText);
         errorMsg = errorJson.detail || errorMsg;
-      } catch (e) {
-      }
+      } catch (e) {}
       throw new Error(errorMsg);
     }
 
@@ -190,6 +190,7 @@ async function onLogin() {
     const cleanName = usernameFromServer.trim();
 
     setAuthToken(token);
+    localStorage.setItem(LS_AUTH_USER, cleanName);
 
     showHTML(`
       <div class="card success fade-in">
@@ -211,6 +212,7 @@ async function onLogin() {
 
   } catch (err) {
     setAuthToken("");
+    localStorage.removeItem(LS_AUTH_USER);
     showHTML(`<div class="error">❌ Ошибка входа: ${err.message}</div>`);
     console.error("Login error:", err);
   }
@@ -218,6 +220,8 @@ async function onLogin() {
 
 function onLogout() {
   setAuthToken("");
+  localStorage.removeItem(LS_AUTH_USER);
+
   showHTML(`
     <div class="info fade-in">
       <h3>👋 До свидания!</h3>
@@ -228,31 +232,49 @@ function onLogout() {
   document.getElementById("loginUser").value = "";
   document.getElementById("loginPass").value = "";
 
-  document.getElementById("userInfo").innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
-  document.getElementById("historyContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю</div>`;
-  document.getElementById("purchasesContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
+  document.getElementById("userInfo").innerHTML =
+    `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
+  document.getElementById("historyContent").innerHTML =
+    `<div class="muted">Войдите, чтобы увидеть историю</div>`;
+  document.getElementById("purchasesContent").innerHTML =
+    `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
+
+  IS_ADMIN = false;
+  const adminBox = document.getElementById("adminUsersBox");
+  if (adminBox) adminBox.style.display = "none";
 
   if (window.reflectAuthStatus) {
     window.reflectAuthStatus();
   }
 }
 
-
 async function onWhoAmI() {
   const userInfoDiv = document.getElementById("userInfo");
 
   if (!getAuthToken()) {
-    userInfoDiv.innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
+    userInfoDiv.innerHTML =
+      `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
     IS_ADMIN = false;
     const adminBox = document.getElementById("adminUsersBox");
     if (adminBox) adminBox.style.display = "none";
     return;
   }
 
+  const cachedName = localStorage.getItem(LS_AUTH_USER);
+  if (cachedName) {
+    userInfoDiv.innerHTML = `
+      <div class="kv">
+        <div><span>Username</span><b>${cachedName}</b></div>
+      </div>
+    `;
+  } else {
+    userInfoDiv.innerHTML = `<div class="muted">Загружаем информацию…</div>`;
+  }
+
   try {
     const response = await fetch(`/api/v1/users/me`, {
       headers: {
-        "Authorization": getAuthToken()
+        Authorization: getAuthToken()
       }
     });
 
@@ -268,6 +290,8 @@ async function onWhoAmI() {
       </div>
     `;
 
+    localStorage.setItem(LS_AUTH_USER, data.username || "");
+
     IS_ADMIN = data.username === "admin";
 
     const adminBox = document.getElementById("adminUsersBox");
@@ -277,7 +301,6 @@ async function onWhoAmI() {
     if (IS_ADMIN) {
       await loadAdminUsers();
     }
-
   } catch (e) {
     userInfoDiv.innerHTML = `<div class="error">❌ Ошибка: ${e.message}</div>`;
     IS_ADMIN = false;
@@ -287,13 +310,12 @@ async function onWhoAmI() {
   }
 }
 
-
-
 async function onHistory() {
   const historyDiv = document.getElementById("historyContent");
 
   if (!getAuthToken()) {
-    historyDiv.innerHTML = `<div class="muted">Войдите, чтобы увидеть историю</div>`;
+    historyDiv.innerHTML =
+      `<div class="muted">Войдите, чтобы увидеть историю</div>`;
     return;
   }
 
@@ -305,20 +327,21 @@ async function onHistory() {
       return;
     }
 
-    const rows = data.map(a => {
-      const date = new Date(a.timestamp);
-      const formattedDate = date.toLocaleString('ru-RU');
+    const rows = data
+      .map((a) => {
+        const date = new Date(a.timestamp);
+        const formattedDate = date.toLocaleString("ru-RU");
 
-      return `
+        return `
         <tr>
           <td>${formattedDate}</td>
           <td><span class="badge-inline">${formatAction(a.action)}</span></td>
-          <td class="mono">${a.productId ? a.productId.substring(0, 8) + '...' : '-'}</td>
+          <td class="mono">${a.productId ? a.productId.substring(0, 8) + "..." : "-"}</td>
           <td>${a.category ?? "-"}</td>
         </tr>
       `;
-    }).join("");
-
+      })
+      .join("");
 
     historyDiv.innerHTML = `
       <p class="muted" style="margin-bottom:12px;">Всего записей: ${data.length}</p>
@@ -335,161 +358,18 @@ async function onHistory() {
       </table>
     `;
   } catch (e) {
-    historyDiv.innerHTML = `<div class="error">❌ Ошибка загрузки истории: ${e.message}</div>`;
+    historyDiv.innerHTML =
+      `<div class="error">❌ Ошибка загрузки истории: ${e.message}</div>`;
     console.error("History error:", e);
   }
 }
-
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("btnRegister").addEventListener("click", onRegister);
-  document.getElementById("btnLogin").addEventListener("click", onLogin);
-  document.getElementById("btnLogout").addEventListener("click", onLogout);
-  document.getElementById("btnHistory").addEventListener("click", onHistory);
-  document.getElementById("btnPurchases").addEventListener("click", onPurchases);
-  document.getElementById("btnUpdatePassword").addEventListener("click", onUpdatePassword);
-  document.getElementById("btnReloadUsers")?.addEventListener("click", loadAdminUsers);
-
-  document.getElementById("regPass2")?.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") onRegister();
-  });
-
-  document.getElementById("loginPass")?.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") onLogin();
-  });
-
-  document.getElementById("updNewPass2")?.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") onUpdatePassword();
-  });
-
-  if (getAuthToken()) {
-    onWhoAmI();
-    onHistory();
-    onPurchases();
-  }
-});
-
-document.addEventListener("click", async (e) => {
-  const passBtn = e.target.closest(".btn-admin-pass");
-  const delBtn = e.target.closest(".btn-admin-del");
-
-  if (passBtn) {
-    if (!IS_ADMIN || !getAuthToken()) {
-      showHTML(`<div class="warn">⚠️ Доступ только для admin</div>`);
-      return;
-    }
-
-    const userId = passBtn.dataset.id;
-    const username = passBtn.dataset.username || "?";
-
-    const newPass = prompt(`Введите новый пароль для пользователя "${username}":`);
-    if (!newPass) return;
-    const newPass2 = prompt(`Повторите новый пароль для "${username}":`);
-    if (!newPass2) return;
-
-    if (newPass !== newPass2) {
-      showHTML(`<div class="error">❌ Пароли не совпадают</div>`);
-      return;
-    }
-
-    if (newPass.length < 6) {
-      showHTML(`<div class="warn">⚠️ Новый пароль должен быть не менее 6 символов</div>`);
-      return;
-    }
-
-    try {
-      const resp = await fetch(`/api/v1/users/admin/users/${encodeURIComponent(userId)}/password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": getAuthToken()
-        },
-        body: JSON.stringify({
-          new_password: newPass,
-          new_password_confirmation: newPass2
-        })
-      });
-
-      if (!resp.ok) {
-        const txt = await resp.text();
-        let msg = "Не удалось обновить пароль";
-        try {
-          const j = JSON.parse(txt);
-          if (j.detail) msg = j.detail;
-        } catch (e2) {
-          if (txt) msg = txt;
-        }
-        throw new Error(msg);
-      }
-
-      showHTML(`
-        <div class="card success fade-in">
-          <h3>✅ Пароль обновлён</h3>
-          <p>Пароль пользователя <b>${username}</b> успешно изменён администратором.</p>
-        </div>
-      `);
-    } catch (err) {
-      showHTML(`<div class="error">❌ Ошибка смены пароля: ${err.message}</div>`);
-      console.error("Admin update password error:", err);
-    }
-
-    return;
-  }
-
-  if (delBtn) {
-    if (!IS_ADMIN || !getAuthToken()) {
-      showHTML(`<div class="warn">⚠️ Доступ только для admin</div>`);
-      return;
-    }
-
-    const userId = delBtn.dataset.id;
-    const username = delBtn.dataset.username || "?";
-
-    if (!confirm(`Вы уверены, что хотите удалить пользователя "${username}"?`)) {
-      return;
-    }
-
-    try {
-      const resp = await fetch(`/api/v1/users/admin/users/${encodeURIComponent(userId)}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": getAuthToken()
-        }
-      });
-
-      if (!resp.ok) {
-        const txt = await resp.text();
-        let msg = "Не удалось удалить пользователя";
-        try {
-          const j = JSON.parse(txt);
-          if (j.detail) msg = j.detail;
-        } catch (e2) {
-          if (txt) msg = txt;
-        }
-        throw new Error(msg);
-      }
-
-      showHTML(`
-        <div class="card success fade-in">
-          <h3>✅ Пользователь удалён</h3>
-          <p>Пользователь <b>${username}</b> был удалён администратором.</p>
-        </div>
-      `);
-
-      await loadAdminUsers();
-    } catch (err) {
-      showHTML(`<div class="error">❌ Ошибка удаления пользователя: ${err.message}</div>`);
-      console.error("Admin delete user error:", err);
-    }
-  }
-});
-
 
 async function onPurchases() {
   const box = document.getElementById("purchasesContent");
 
   if (!getAuthToken()) {
-    box.innerHTML = `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
+    box.innerHTML =
+      `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
     return;
   }
 
@@ -501,12 +381,13 @@ async function onPurchases() {
       return;
     }
 
-    const rows = data.map(p => {
-      const date = new Date(p.timestamp);
-      const formattedDate = date.toLocaleString('ru-RU');
-      const prod = p.product || {};
+    const rows = data
+      .map((p) => {
+        const date = new Date(p.timestamp);
+        const formattedDate = date.toLocaleString("ru-RU");
+        const prod = p.product || {};
 
-      return `
+        return `
         <tr>
           <td>${formattedDate}</td>
           <td>${prod.brand || "?"}</td>
@@ -516,7 +397,8 @@ async function onPurchases() {
           <td class="mono">${prod.id ? prod.id.substring(0, 8) + "..." : "-"}</td>
         </tr>
       `;
-    }).join("");
+      })
+      .join("");
 
     box.innerHTML = `
       <p class="muted" style="margin-bottom:12px;">Всего покупок: ${data.length}</p>
@@ -535,11 +417,11 @@ async function onPurchases() {
       </table>
     `;
   } catch (e) {
-    box.innerHTML = `<div class="error">❌ Ошибка загрузки покупок: ${e.message}</div>`;
+    box.innerHTML =
+      `<div class="error">❌ Ошибка загрузки покупок: ${e.message}</div>`;
     console.error("Purchases error:", e);
   }
 }
-
 
 async function onUpdatePassword() {
   const oldPass = document.getElementById("updOldPass").value;
@@ -547,7 +429,9 @@ async function onUpdatePassword() {
   const newPass2 = document.getElementById("updNewPass2").value;
 
   if (!getAuthToken()) {
-    showHTML(`<div class="warn">⚠️ Для смены пароля необходимо войти в аккаунт</div>`);
+    showHTML(
+      `<div class="warn">⚠️ Для смены пароля необходимо войти в аккаунт</div>`
+    );
     return;
   }
 
@@ -557,7 +441,9 @@ async function onUpdatePassword() {
   }
 
   if (newPass.length < 6) {
-    showHTML(`<div class="warn">⚠️ Новый пароль должен быть не менее 6 символов</div>`);
+    showHTML(
+      `<div class="warn">⚠️ Новый пароль должен быть не менее 6 символов</div>`
+    );
     return;
   }
 
@@ -567,7 +453,9 @@ async function onUpdatePassword() {
   }
 
   if (newPass === oldPass) {
-    showHTML(`<div class="warn">⚠️ Новый пароль не должен совпадать со старым</div>`);
+    showHTML(
+      `<div class="warn">⚠️ Новый пароль не должен совпадать со старым</div>`
+    );
     return;
   }
 
@@ -576,7 +464,7 @@ async function onUpdatePassword() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": getAuthToken()
+        Authorization: getAuthToken()
       },
       body: JSON.stringify({
         old_password: oldPass,
@@ -609,17 +497,191 @@ async function onUpdatePassword() {
     document.getElementById("updNewPass2").value = "";
 
     setAuthToken("");
+    localStorage.removeItem(LS_AUTH_USER);
 
     if (window.reflectAuthStatus) {
       window.reflectAuthStatus();
     }
 
-    document.getElementById("userInfo").innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
-    document.getElementById("historyContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю</div>`;
-    document.getElementById("purchasesContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
-
+    document.getElementById("userInfo").innerHTML =
+      `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
+    document.getElementById("historyContent").innerHTML =
+      `<div class="muted">Войдите, чтобы увидеть историю</div>`;
+    document.getElementById("purchasesContent").innerHTML =
+      `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
   } catch (err) {
     showHTML(`<div class="error">❌ Ошибка смены пароля: ${err.message}</div>`);
     console.error("Update password error:", err);
   }
 }
+
+function initUserPage() {
+  document.getElementById("btnRegister")?.addEventListener("click", onRegister);
+  document.getElementById("btnLogin")?.addEventListener("click", onLogin);
+  document.getElementById("btnLogout")?.addEventListener("click", onLogout);
+  document.getElementById("btnHistory")?.addEventListener("click", onHistory);
+  document.getElementById("btnPurchases")?.addEventListener("click", onPurchases);
+  document
+    .getElementById("btnUpdatePassword")
+    ?.addEventListener("click", onUpdatePassword);
+  document
+    .getElementById("btnReloadUsers")
+    ?.addEventListener("click", loadAdminUsers);
+
+  document.getElementById("regPass2")?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") onRegister();
+  });
+
+  document.getElementById("loginPass")?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") onLogin();
+  });
+
+  document.getElementById("updNewPass2")?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") onUpdatePassword();
+  });
+
+  if (getAuthToken()) {
+    onWhoAmI();
+    onHistory();
+    onPurchases();
+  } else {
+    localStorage.removeItem(LS_AUTH_USER);
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initUserPage);
+} else {
+  initUserPage();
+}
+
+document.addEventListener("click", async (e) => {
+  const passBtn = e.target.closest(".btn-admin-pass");
+  const delBtn = e.target.closest(".btn-admin-del");
+
+  if (passBtn) {
+    if (!IS_ADMIN || !getAuthToken()) {
+      showHTML(`<div class="warn">⚠️ Доступ только для admin</div>`);
+      return;
+    }
+
+    const userId = passBtn.dataset.id;
+    const username = passBtn.dataset.username || "?";
+
+    const newPass = prompt(
+      `Введите новый пароль для пользователя "${username}":`
+    );
+    if (!newPass) return;
+    const newPass2 = prompt(
+      `Повторите новый пароль для "${username}":`
+    );
+    if (!newPass2) return;
+
+    if (newPass !== newPass2) {
+      showHTML(`<div class="error">❌ Пароли не совпадают</div>`);
+      return;
+    }
+
+    if (newPass.length < 6) {
+      showHTML(
+        `<div class="warn">⚠️ Новый пароль должен быть не менее 6 символов</div>`
+      );
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `/api/v1/users/admin/users/${encodeURIComponent(userId)}/password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: getAuthToken()
+          },
+          body: JSON.stringify({
+            new_password: newPass,
+            new_password_confirmation: newPass2
+          })
+        }
+      );
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        let msg = "Не удалось обновить пароль";
+        try {
+          const j = JSON.parse(txt);
+          if (j.detail) msg = j.detail;
+        } catch (e2) {
+          if (txt) msg = txt;
+        }
+        throw new Error(msg);
+      }
+
+      showHTML(`
+        <div class="card success fade-in">
+          <h3>✅ Пароль обновлён</h3>
+          <p>Пароль пользователя <b>${username}</b> успешно изменён администратором.</p>
+        </div>
+      `);
+    } catch (err) {
+      showHTML(
+        `<div class="error">❌ Ошибка смены пароля: ${err.message}</div>`
+      );
+      console.error("Admin update password error:", err);
+    }
+
+    return;
+  }
+
+  if (delBtn) {
+    if (!IS_ADMIN || !getAuthToken()) {
+      showHTML(`<div class="warn">⚠️ Доступ только для admin</div>`);
+      return;
+    }
+
+    const userId = delBtn.dataset.id;
+    const username = delBtn.dataset.username || "?";
+
+    if (!confirm(`Вы уверены, что хотите удалить пользователя "${username}"?`)) {
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `/api/v1/users/admin/users/${encodeURIComponent(userId)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: getAuthToken()
+          }
+        }
+      );
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        let msg = "Не удалось удалить пользователя";
+        try {
+          const j = JSON.parse(txt);
+          if (j.detail) msg = j.detail;
+        } catch (e2) {
+          if (txt) msg = txt;
+        }
+        throw new Error(msg);
+      }
+
+      showHTML(`
+        <div class="card success fade-in">
+          <h3>✅ Пользователь удалён</h3>
+          <p>Пользователь <b>${username}</b> был удалён администратором.</p>
+        </div>
+      `);
+
+      await loadAdminUsers();
+    } catch (err) {
+      showHTML(
+        `<div class="error">❌ Ошибка удаления пользователя: ${err.message}</div>`
+      );
+      console.error("Admin delete user error:", err);
+    }
+  }
+});

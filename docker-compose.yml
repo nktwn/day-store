@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  app:
+    image: day-store:1
+    container_name: daystore-app
+    restart: always
+    environment:
+      PORT: 8080
+      MONGO_URI: mongodb://host.docker.internal:27017
+      MONGO_DB: daystore
+    ports:
+      - "8080:8080"
