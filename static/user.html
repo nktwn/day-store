@@ -12,6 +12,14 @@
 <script type="module" src="/header.js"></script>
 
 <main class="container wide fade-in">
+
+  <section id="messagesPanel" class="panel fade-in" style="display:none;margin-top:24px;">
+    <div class="panel-title">
+      <h3>💬 Сообщения</h3>
+    </div>
+    <div id="pretty" class="pretty"></div>
+  </section>
+
   <section class="panel" style="margin-top:30px;">
     <div class="panel-title">
       <h2>Управление аккаунтом</h2>
@@ -19,6 +27,7 @@
     </div>
 
     <div class="grid cols-2" style="gap:24px;">
+
       <div class="u-col" style="gap:24px;">
         <div class="card big fade-in">
           <h3 style="margin:0 0 12px">🔐 Вход</h3>
@@ -70,12 +79,19 @@
             <div class="muted">Войдите, чтобы увидеть историю покупок</div>
           </div>
         </div>
+
+        <div class="card big fade-in" id="adminUsersBox" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0">👥 Список пользователей (admin)</h3>
+            <button id="btnReloadUsers" class="btn outline small">Обновить</button>
+          </div>
+          <div id="adminUsersContent" style="max-height:400px;overflow-y:auto;">
+            <div class="muted">Доступно только пользователю admin</div>
+          </div>
+        </div>
+
       </div>
-
-
-  <section class="panel fade-in">
-    <div class="panel-title"><h3>💬 Сообщения</h3></div>
-    <div id="pretty" class="pretty"></div>
+    </div>
   </section>
 </main>
 

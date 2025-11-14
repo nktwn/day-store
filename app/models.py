@@ -58,3 +58,12 @@ class UserActionOut(BaseModel):
 class PurchaseOut(BaseModel):
     timestamp: datetime
     product: ProductOut
+
+class UserPasswordUpdate(BaseModel):
+    old_password: str
+    new_password: str
+    new_password_confirmation: str
+
+class AdminPasswordUpdate(BaseModel):
+    new_password: str
+    new_password_confirmation: str

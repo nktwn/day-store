@@ -16,10 +16,15 @@ from app.models import (
     ProductOut,
     Category,
     PurchaseOut,
+    UserPasswordUpdate,
+    AdminPasswordUpdate,
 )
 
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
+
+def _is_admin(user: UserInDB) -> bool:
+    return user.username == "admin"
 
 
 @router.post("/registration", response_model=UserPublic)
@@ -233,3 +238,104 @@ async def me_purchases(
         )
 
     return result
+
+@router.post("/me/update/password")
+async def update_password(
+    body: UserPasswordUpdate,
+    user: UserInDB = Depends(get_current_user),
+):
+    if not verify_password(body.old_password, user.password):
+        raise HTTPException(status_code=400, detail="Текущий пароль указан неверно")
+
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Новый пароль должен быть не менее 6 символов")
+
+    if body.new_password != body.new_password_confirmation:
+        raise HTTPException(status_code=400, detail="Повтор нового пароля не совпадает")
+
+    if body.new_password == body.old_password:
+        raise HTTPException(status_code=400, detail="Новый пароль не должен совпадать с текущим")
+
+    await users_coll.update_one(
+        {"_id": ObjectId(user.id)},
+        {
+            "$set": {
+                "password": hash_password(body.new_password),
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+
+    return {"message": "Password updated"}
+
+@router.get("/admin/users", response_model=List[UserPublic])
+async def admin_list_users(current: UserInDB = Depends(get_current_user)):
+    if not _is_admin(current):
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    cursor = users_coll.find({})
+    docs = await cursor.to_list(length=1000)
+
+    out: List[UserPublic] = []
+    for d in docs:
+        username = d.get("username", "")
+        if username == "admin":
+            continue
+        out.append(UserPublic(id=str(d["_id"]), username=username))
+
+    return out
+
+@router.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, current: UserInDB = Depends(get_current_user)):
+    if not _is_admin(current):
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    doc = await users_coll.find_one({"_id": ObjectId(user_id)}) if ObjectId.is_valid(user_id) \
+        else await users_coll.find_one({"_id": user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if doc.get("username") == "admin":
+        raise HTTPException(status_code=400, detail="Cannot delete admin user")
+
+    await users_coll.delete_one({"_id": doc["_id"]})
+    await actions_coll.delete_many({"userId": str(doc["_id"])})
+
+    return {"status": "deleted"}
+
+@router.post("/admin/users/{user_id}/password")
+async def admin_update_user_password(
+    user_id: str,
+    body: AdminPasswordUpdate,
+    current: UserInDB = Depends(get_current_user),
+):
+    if not _is_admin(current):
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Новый пароль должен быть не менее 6 символов")
+
+    if body.new_password != body.new_password_confirmation:
+        raise HTTPException(status_code=400, detail="Повтор нового пароля не совпадает")
+
+    doc = await users_coll.find_one({"_id": ObjectId(user_id)}) if ObjectId.is_valid(user_id) \
+        else await users_coll.find_one({"_id": user_id})
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if doc.get("username") == "admin":
+        raise HTTPException(status_code=400, detail="Cannot change admin password here")
+
+    await users_coll.update_one(
+        {"_id": doc["_id"]},
+        {
+            "$set": {
+                "password": hash_password(body.new_password),
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+
+    return {"message": "Password updated by admin"}
+

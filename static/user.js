@@ -2,8 +2,21 @@ import { fetchJSON, makeBasic, setAuthToken, getAuthToken } from "./common.js";
 
 function showHTML(html) {
   const box = document.getElementById("pretty");
-  if (box) box.innerHTML = html;
+  const panel = document.getElementById("messagesPanel");
+
+  if (box) {
+    box.innerHTML = html;
+  }
+
+  if (panel) {
+    const hasContent = html && String(html).trim().length > 0;
+    panel.style.display = hasContent ? "block" : "none";
+  }
 }
+
+
+let IS_ADMIN = false;
+
 
 function formatAction(action) {
   switch (action) {
@@ -87,6 +100,62 @@ async function onRegister() {
     console.error("Registration error:", err);
   }
 }
+
+async function loadAdminUsers() {
+  const box = document.getElementById("adminUsersContent");
+  const wrapper = document.getElementById("adminUsersBox");
+
+  if (!box || !wrapper) return;
+
+  if (!getAuthToken() || !IS_ADMIN) {
+    wrapper.style.display = "none";
+    return;
+  }
+
+  wrapper.style.display = "block";
+  box.innerHTML = `<div class="muted mono">Загружаем пользователей…</div>`;
+
+  try {
+    const users = await fetchJSON(`/api/v1/users/admin/users`);
+
+    if (!Array.isArray(users) || !users.length) {
+      box.innerHTML = `<div class="muted">Пользователей не найдено</div>`;
+      return;
+    }
+
+    const rows = users.map(u => `
+      <tr>
+        <td>${u.username}</td>
+        <td class="mono">${u.id ? u.id.substring(0,8) + "..." : "-"}</td>
+        <td>
+          <button class="btn outline small btn-admin-pass" data-id="${u.id}" data-username="${u.username}">
+            Update password
+          </button>
+          <button class="btn danger small btn-admin-del" data-id="${u.id}" data-username="${u.username}" style="margin-left:6px;">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `).join("");
+
+    box.innerHTML = `
+      <table class="table compact">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>ID</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  } catch (e) {
+    box.innerHTML = `<div class="error">❌ Ошибка загрузки пользователей: ${e.message}</div>`;
+    console.error("Admin users load error:", e);
+  }
+}
+
 
 async function onLogin() {
   const username = document.getElementById("loginUser").value.trim();
@@ -174,6 +243,9 @@ async function onWhoAmI() {
 
   if (!getAuthToken()) {
     userInfoDiv.innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
+    IS_ADMIN = false;
+    const adminBox = document.getElementById("adminUsersBox");
+    if (adminBox) adminBox.style.display = "none";
     return;
   }
 
@@ -195,11 +267,26 @@ async function onWhoAmI() {
         <div><span>Username</span><b>${data.username}</b></div>
       </div>
     `;
+
+    IS_ADMIN = data.username === "admin";
+
+    const adminBox = document.getElementById("adminUsersBox");
+    if (adminBox) {
+      adminBox.style.display = IS_ADMIN ? "block" : "none";
+    }
+    if (IS_ADMIN) {
+      await loadAdminUsers();
+    }
+
   } catch (e) {
     userInfoDiv.innerHTML = `<div class="error">❌ Ошибка: ${e.message}</div>`;
+    IS_ADMIN = false;
+    const adminBox = document.getElementById("adminUsersBox");
+    if (adminBox) adminBox.style.display = "none";
     console.error("WhoAmI error:", e);
   }
 }
+
 
 
 async function onHistory() {
@@ -260,6 +347,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnLogout").addEventListener("click", onLogout);
   document.getElementById("btnHistory").addEventListener("click", onHistory);
   document.getElementById("btnPurchases").addEventListener("click", onPurchases);
+  document.getElementById("btnUpdatePassword").addEventListener("click", onUpdatePassword);
+  document.getElementById("btnReloadUsers")?.addEventListener("click", loadAdminUsers);
 
   document.getElementById("regPass2")?.addEventListener("keypress", (e) => {
     if (e.key === "Enter") onRegister();
@@ -269,10 +358,129 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") onLogin();
   });
 
+  document.getElementById("updNewPass2")?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") onUpdatePassword();
+  });
+
   if (getAuthToken()) {
     onWhoAmI();
     onHistory();
     onPurchases();
+  }
+});
+
+document.addEventListener("click", async (e) => {
+  const passBtn = e.target.closest(".btn-admin-pass");
+  const delBtn = e.target.closest(".btn-admin-del");
+
+  if (passBtn) {
+    if (!IS_ADMIN || !getAuthToken()) {
+      showHTML(`<div class="warn">⚠️ Доступ только для admin</div>`);
+      return;
+    }
+
+    const userId = passBtn.dataset.id;
+    const username = passBtn.dataset.username || "?";
+
+    const newPass = prompt(`Введите новый пароль для пользователя "${username}":`);
+    if (!newPass) return;
+    const newPass2 = prompt(`Повторите новый пароль для "${username}":`);
+    if (!newPass2) return;
+
+    if (newPass !== newPass2) {
+      showHTML(`<div class="error">❌ Пароли не совпадают</div>`);
+      return;
+    }
+
+    if (newPass.length < 6) {
+      showHTML(`<div class="warn">⚠️ Новый пароль должен быть не менее 6 символов</div>`);
+      return;
+    }
+
+    try {
+      const resp = await fetch(`/api/v1/users/admin/users/${encodeURIComponent(userId)}/password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": getAuthToken()
+        },
+        body: JSON.stringify({
+          new_password: newPass,
+          new_password_confirmation: newPass2
+        })
+      });
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        let msg = "Не удалось обновить пароль";
+        try {
+          const j = JSON.parse(txt);
+          if (j.detail) msg = j.detail;
+        } catch (e2) {
+          if (txt) msg = txt;
+        }
+        throw new Error(msg);
+      }
+
+      showHTML(`
+        <div class="card success fade-in">
+          <h3>✅ Пароль обновлён</h3>
+          <p>Пароль пользователя <b>${username}</b> успешно изменён администратором.</p>
+        </div>
+      `);
+    } catch (err) {
+      showHTML(`<div class="error">❌ Ошибка смены пароля: ${err.message}</div>`);
+      console.error("Admin update password error:", err);
+    }
+
+    return;
+  }
+
+  if (delBtn) {
+    if (!IS_ADMIN || !getAuthToken()) {
+      showHTML(`<div class="warn">⚠️ Доступ только для admin</div>`);
+      return;
+    }
+
+    const userId = delBtn.dataset.id;
+    const username = delBtn.dataset.username || "?";
+
+    if (!confirm(`Вы уверены, что хотите удалить пользователя "${username}"?`)) {
+      return;
+    }
+
+    try {
+      const resp = await fetch(`/api/v1/users/admin/users/${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": getAuthToken()
+        }
+      });
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        let msg = "Не удалось удалить пользователя";
+        try {
+          const j = JSON.parse(txt);
+          if (j.detail) msg = j.detail;
+        } catch (e2) {
+          if (txt) msg = txt;
+        }
+        throw new Error(msg);
+      }
+
+      showHTML(`
+        <div class="card success fade-in">
+          <h3>✅ Пользователь удалён</h3>
+          <p>Пользователь <b>${username}</b> был удалён администратором.</p>
+        </div>
+      `);
+
+      await loadAdminUsers();
+    } catch (err) {
+      showHTML(`<div class="error">❌ Ошибка удаления пользователя: ${err.message}</div>`);
+      console.error("Admin delete user error:", err);
+    }
   }
 });
 
@@ -332,3 +540,86 @@ async function onPurchases() {
   }
 }
 
+
+async function onUpdatePassword() {
+  const oldPass = document.getElementById("updOldPass").value;
+  const newPass = document.getElementById("updNewPass").value;
+  const newPass2 = document.getElementById("updNewPass2").value;
+
+  if (!getAuthToken()) {
+    showHTML(`<div class="warn">⚠️ Для смены пароля необходимо войти в аккаунт</div>`);
+    return;
+  }
+
+  if (!oldPass || !newPass || !newPass2) {
+    showHTML(`<div class="warn">⚠️ Заполните все поля для смены пароля</div>`);
+    return;
+  }
+
+  if (newPass.length < 6) {
+    showHTML(`<div class="warn">⚠️ Новый пароль должен быть не менее 6 символов</div>`);
+    return;
+  }
+
+  if (newPass !== newPass2) {
+    showHTML(`<div class="error">❌ Новый пароль и подтверждение не совпадают</div>`);
+    return;
+  }
+
+  if (newPass === oldPass) {
+    showHTML(`<div class="warn">⚠️ Новый пароль не должен совпадать со старым</div>`);
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/v1/users/me/update/password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": getAuthToken()
+      },
+      body: JSON.stringify({
+        old_password: oldPass,
+        new_password: newPass,
+        new_password_confirmation: newPass2
+      })
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      let msg = "Не удалось обновить пароль";
+      try {
+        const j = JSON.parse(txt);
+        if (j.detail) msg = j.detail;
+      } catch (e) {
+        if (txt) msg = txt;
+      }
+      throw new Error(msg);
+    }
+
+    showHTML(`
+      <div class="card success fade-in">
+        <h3>✅ Пароль обновлён</h3>
+        <p>Ваш пароль успешно изменён. Пожалуйста, войдите снова.</p>
+      </div>
+    `);
+
+    document.getElementById("updOldPass").value = "";
+    document.getElementById("updNewPass").value = "";
+    document.getElementById("updNewPass2").value = "";
+
+    setAuthToken("");
+
+    if (window.reflectAuthStatus) {
+      window.reflectAuthStatus();
+    }
+
+    document.getElementById("userInfo").innerHTML = `<div class="muted">Войдите, чтобы увидеть информацию</div>`;
+    document.getElementById("historyContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю</div>`;
+    document.getElementById("purchasesContent").innerHTML = `<div class="muted">Войдите, чтобы увидеть историю покупок</div>`;
+
+  } catch (err) {
+    showHTML(`<div class="error">❌ Ошибка смены пароля: ${err.message}</div>`);
+    console.error("Update password error:", err);
+  }
+}

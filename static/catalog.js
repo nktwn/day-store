@@ -117,10 +117,8 @@ async function maybeLoadRecommendations() {
   if (!list || !hint) return;
 
   list.innerHTML = `<div class="muted mono">Loading...</div>`;
-  hint.textContent = "Загружаем персональные рекомендации...";
 
   if (!getAuthToken()) {
-    hint.textContent = "Войдите в аккаунт, чтобы увидеть персональные рекомендации";
     list.innerHTML = `<div class="muted">🔒 Нет данных для рекомендаций</div>`;
     return;
   }
@@ -160,7 +158,6 @@ async function maybeLoadRecommendations() {
       )
       .join("");
 
-    hint.textContent = "Персональные рекомендации";
   } catch (e) {
     console.error("RECO ERROR:", e);
     hint.textContent = "Ошибка загрузки рекомендаций";
