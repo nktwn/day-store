@@ -2009,6 +2009,18 @@ maybeLoadRecommendations().catch(console.error);
         </div>
 
         <div class="card big fade-in">
+          <h3 style="margin:0 0 12px">🔑 Смена пароля</h3>
+          <div class="u-col">
+            <input id="updOldPass" class="input" type="password" placeholder="Текущий пароль" />
+            <input id="updNewPass" class="input" type="password" placeholder="Новый пароль" />
+            <input id="updNewPass2" class="input" type="password" placeholder="Повторите новый пароль" />
+          </div>
+          <button id="btnUpdatePassword" class="btn block" style="margin-top:10px;">
+            Обновить пароль
+          </button>
+        </div>
+
+        <div class="card big fade-in">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <h3 style="margin:0">📜 История действий</h3>
             <button id="btnHistory" class="btn outline small">Обновить</button>
@@ -2023,7 +2035,7 @@ maybeLoadRecommendations().catch(console.error);
             <h3 style="margin:0">🛒 История покупок</h3>
             <button id="btnPurchases" class="btn outline small">Обновить</button>
           </div>
-          <div id="purchasesContent" style="max-height:400px;overflow-y:auto%;">
+          <div id="purchasesContent" style="max-height:400px;overflow-y:auto;">
             <div class="muted">Войдите, чтобы увидеть историю покупок</div>
           </div>
         </div>
